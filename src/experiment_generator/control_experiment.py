@@ -1,8 +1,8 @@
 from payu.git_utils import GitRepository
+from payu.branch import checkout_branch
 from .f90nml_updater import F90NamelistUpdater
 from .config_updater import ConfigUpdater
 from .base_experiment import BaseExperiment
-from payu.branch import checkout_branch
 
 
 class ControlExperiment(BaseExperiment):
@@ -14,9 +14,11 @@ class ControlExperiment(BaseExperiment):
     def __init__(self, directory, indata) -> None:
         super().__init__(indata)
         self.directory = directory
+        self.gitrepository = GitRepository(directory)
+
+        # updater for each configuration file
         self.f90namelistupdater = F90NamelistUpdater(directory)
         self.configupdater = ConfigUpdater(directory)
-        self.gitrepository = GitRepository(directory)
 
     # control experiment
     def setup_control_expt(self) -> None:
@@ -37,9 +39,9 @@ class ControlExperiment(BaseExperiment):
         if not control_data:
             raise ValueError("No control experiment data provided!")
 
-        if self.control_branch_name in [
-            x.name for x in self.gitrepository.repo.branches
-        ]:
+        if self.control_branch_name in {
+            i.name for i in self.gitrepository.repo.branches
+        }:
             # Ensure the repository is on the control branch
             checkout_branch(
                 branch_name=self.control_branch_name,
@@ -52,8 +54,8 @@ class ControlExperiment(BaseExperiment):
             if any(part in exclude_dirs for part in file.parts):
                 continue
             target_file = file.relative_to(self.directory)
-
-            yaml_data = control_data.get(target_file.name)
+            # eg, ice/cice_in.nml or ice_in.nml
+            yaml_data = control_data.get(str(target_file))
 
             if yaml_data:
                 # Updates config entries from f90nml files

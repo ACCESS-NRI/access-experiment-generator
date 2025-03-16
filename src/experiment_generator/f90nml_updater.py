@@ -1,10 +1,14 @@
 import os
+from pathlib import Path
 import numpy as np
 import f90nml
-from pathlib import Path
 
 
 class F90NamelistUpdater:
+    """
+    A utility class for updating fortran namelists.
+    """
+
     def __init__(self, directory: Path) -> None:
         self.directory = directory
 
@@ -12,8 +16,6 @@ class F90NamelistUpdater:
         self,
         param_dict: dict,
         target_file: str,
-        append_group_list: list = None,
-        indx: int = None,
     ) -> None:
         """
         Updates namelist parameters based on the YAML configuration.
@@ -25,43 +27,18 @@ class F90NamelistUpdater:
         nml_path = self.directory / target_file
         nml_tmp_path = nml_path.with_suffix(".tmp")
 
-        if indx is not None:
-            nml_group = get_namelist_group(append_group_list, indx)
-            patch_dict = {nml_group: {}}
-        else:
-            nml_group = None
-            patch_dict = {}
+        patch_dict = {}
 
         for nml_name, nml_value in param_dict.items():
-            if nml_group is not None:
-                group = patch_dict.setdefault(nml_group, {})
-            else:
-                group = patch_dict
-
             if nml_name == "turning_angle":
-                group["cosw"] = np.cos(nml_value * np.pi / 180.0)
-                group["sinw"] = np.sin(nml_value * np.pi / 180.0)
+                patch_dict["cosw"] = np.cos(nml_value * np.pi / 180.0)
+                patch_dict["sinw"] = np.sin(nml_value * np.pi / 180.0)
             else:
-                group[nml_name] = nml_value
+                patch_dict[nml_name] = nml_value
 
         f90nml.patch(nml_path, patch_dict, nml_tmp_path)
         os.rename(nml_tmp_path, nml_path)
         format_nml_params(nml_path, param_dict)
-
-
-def get_namelist_group(list_of_groupname: list[str], indx: int) -> str:
-    """
-    Retrieves the namelist group corresponding to the given index.
-
-    Args:
-        list_of_groupname (list[str]): List of namelist group names.
-        indx (int): Index to retrieve from the list.
-
-    Returns:
-        str: The corresponding namelist group name.
-    """
-    nml_group = list_of_groupname[indx]
-    return nml_group
 
 
 def format_nml_params(nml_path: str, param_dict: dict) -> None:
@@ -96,6 +73,8 @@ def format_nml_params(nml_path: str, param_dict: dict) -> None:
                 tmp_values = ".true." if tmp_values else ".false."
 
             for idx, line in enumerate(fileread):
+                if line.lstrip().startswith("!"):
+                    continue
                 if tmp_param in line:
                     fileread[idx] = f"    {tmp_param} = {tmp_values}\n"
                     break

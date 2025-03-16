@@ -1,7 +1,10 @@
 import warnings
 from dataclasses import dataclass
-from .control_experiment import ControlExperiment
 from payu.branch import checkout_branch
+from .control_experiment import ControlExperiment
+
+
+BRANCH_SUFFIX = "_branches"
 
 
 @dataclass
@@ -11,7 +14,6 @@ class ExperimentDefinition:
     """
 
     block_name: str
-    run_name: str
     branch_name: str
     file_params: dict[str, dict]
 
@@ -20,9 +22,6 @@ class PerturbationExperiment(ControlExperiment):
     """
     Class to manage perturbation experiments by applying parameter sensitivity tests.
     """
-
-    def __init__(self, directory, indata) -> None:
-        super().__init__(directory, indata)
 
     def manage_perturb_expt(self) -> None:
         """
@@ -67,32 +66,32 @@ class PerturbationExperiment(ControlExperiment):
         """
         experiment_definitions = []
         for block_name, blockcontents in namelists.items():
-            dir_key = f"{block_name}_dirs"
-            if dir_key not in blockcontents:
+            branch_keys = f"{block_name}{BRANCH_SUFFIX}"
+            if branch_keys not in blockcontents:
                 warnings.warn(
-                    f"\nNO {dir_key} were provided, hence skipping parameter-sensitivity tests!",
+                    f"\nNO {branch_keys} were provided, hence skipping parameter-sensitivity tests!",
                     UserWarning,
                 )
                 continue
-            run_names = blockcontents[dir_key]
+            branch_names = blockcontents[branch_keys]
+            total_exps = len(branch_names)
 
             # all other keys hold file-specific parameter configurations
-            file_params_all = {k: v for k, v in blockcontents.items() if k != dir_key}
+            file_params_all = {
+                k: v for k, v in blockcontents.items() if k != branch_keys
+            }
 
-            for indx, run_name in enumerate(run_names):
+            for indx, branch_name in enumerate(branch_names):
                 single_run_file_params = {}
                 for filename, param_dict in file_params_all.items():
                     run_specific_params = self._extract_run_specific_params(
-                        param_dict, indx
+                        param_dict, indx, total_exps
                     )
                     single_run_file_params[filename] = run_specific_params
 
-                # Create a new branch name from the block name and run name
-                branch_name = f"{block_name}/{run_name}"
                 experiment_definitions.append(
                     ExperimentDefinition(
                         block_name=block_name,
-                        run_name=run_name,
                         branch_name=branch_name,
                         file_params=single_run_file_params,
                     )
@@ -100,7 +99,9 @@ class PerturbationExperiment(ControlExperiment):
 
         return experiment_definitions
 
-    def _extract_run_specific_params(self, nested_dict: dict, indx: int) -> dict:
+    def _extract_run_specific_params(
+        self, nested_dict: dict, indx: int, total_exps: int
+    ) -> dict:
         """
         Recursively extract run-specific parameters from a nested dictionary.
         """
@@ -108,17 +109,46 @@ class PerturbationExperiment(ControlExperiment):
         for key, value in nested_dict.items():
             # nested dictionary
             if isinstance(value, dict):
-                result[key] = self._extract_run_specific_params(value, indx)
+                result[key] = self._extract_run_specific_params(value, indx, total_exps)
             # list or list of lists
             elif isinstance(value, list):
+                # if it's a list of dicts (e.g., for submodels in `config.yaml` in OM2)
+                if len(value) > 0 and all(isinstance(i, dict) for i in value):
+                    # process each dict in the list for the given column indx
+                    tmp = [
+                        self._extract_run_specific_params(i, indx, total_exps)
+                        for i in value
+                    ]
+                    if all(i == tmp[0] for i in tmp):
+                        result[key] = tmp[0]
+                    else:
+                        result[key] = tmp
                 # if it's a list of lists
-                if len(value) > 0 and all(isinstance(i, list) for i in value):
-                    # each row in `value` so pick the indx-th column
-                    # eg value = [ [a0,a1], [b0,b1] ] => run #0 -> [a0,b0], run #1 -> [a1,b1]
-                    result[key] = [row[indx] for row in value]
+                elif len(value) > 0 and all(isinstance(i, list) for i in value):
+                    new_list = []
+                    for row in value:
+                        if len(row) == 1:
+                            # Broadcast the single element for any index
+                            new_list.append(row[0])
+                        else:
+                            if len(row) != total_exps:
+                                raise ValueError(
+                                    f"For key '{key}', the inner list length {len(row)}, but the total experiment {total_exps}"
+                                )
+                            new_list.append(row[indx])
+                    result[key] = new_list
                 else:
-                    # plain list => pick one element by index
-                    result[key] = value[indx]
+                    # Plain list: if it has one element or all elements are identical, broadcast that element.
+                    if len(value) == 1 or (
+                        len(value) > 1 and all(i == value[0] for i in value)
+                    ):
+                        result[key] = value[0]
+                    else:
+                        if len(value) != total_exps:
+                            raise ValueError(
+                                f"For key '{key}', the inner list length {len(row)}, but the total experiment {total_exps}"
+                            )
+                        result[key] = value[indx]
             # Scalar, string, etc so return as is
             else:
                 result[key] = value
@@ -137,7 +167,6 @@ class PerturbationExperiment(ControlExperiment):
             print(
                 f"-- Branch {expt_def.branch_name} already exists, switching to it only!"
             )
-            print(self.directory)
             checkout_branch(
                 branch_name=expt_def.branch_name,
                 is_new_branch=False,
