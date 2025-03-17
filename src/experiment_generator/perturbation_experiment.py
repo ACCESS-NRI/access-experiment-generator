@@ -200,3 +200,6 @@ class PerturbationExperiment(ControlExperiment):
 
             elif filename == "config.yaml":
                 self.configupdater.update_config_params(params, filename)
+
+            elif filename == "nuopc.runconfig":
+                self.nuopcrunconfigupdater.update_runconfig_params(params, filename)

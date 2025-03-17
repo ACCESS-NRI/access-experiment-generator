@@ -2,6 +2,7 @@ from payu.git_utils import GitRepository
 from payu.branch import checkout_branch
 from .f90nml_updater import F90NamelistUpdater
 from .config_updater import ConfigUpdater
+from .nuopc_runconfig_updater import NuopcRunConfigUpdater
 from .base_experiment import BaseExperiment
 
 
@@ -19,6 +20,7 @@ class ControlExperiment(BaseExperiment):
         # updater for each configuration file
         self.f90namelistupdater = F90NamelistUpdater(directory)
         self.configupdater = ConfigUpdater(directory)
+        self.nuopcrunconfigupdater = NuopcRunConfigUpdater(directory)
 
     # control experiment
     def setup_control_expt(self) -> None:
@@ -65,6 +67,12 @@ class ControlExperiment(BaseExperiment):
                 # Updates config entries from `config_yaml`
                 if target_file.name == "config.yaml":
                     self.configupdater.update_config_params(yaml_data, target_file)
+
+                # Updates nuopc.runconfig entries from `nuopc.runconfig`
+                if target_file.name == "nuopc.runconfig":
+                    self.nuopcrunconfigupdater.update_runconfig_params(
+                        yaml_data, target_file
+                    )
 
         # git commit the modified files, if nothing changed, no commit will be made.
         modified_files = [
