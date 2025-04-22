@@ -14,30 +14,67 @@ class F90NamelistUpdater:
 
     def update_nml_params(
         self,
-        param_dict: dict,
-        target_file: str,
+        target_file: Path,
+        param_dict: dict[str, dict[str, any]],
     ) -> None:
         """
         Updates namelist parameters based on the YAML configuration.
 
         Args:
-            param_dict (dict): The dictionary of parameters to update.
-            target_file (str): The file to update.
+            target_file (Path): Path to the namelist file, relative to `self.directory`.
+            param_dict (dict[str, dict[str, any]]):
+                Mapping from namelist section names to
+                dictionaries of variable names to new values.
+
+                Use value=None or "REMOVE" to delete a variable.
+
+                Special key "turning_angle" will generate
+                "cosw" and "sinw" entries in the "dynamics_nml" section.
         """
         nml_path = self.directory / target_file
         nml_tmp_path = nml_path.with_suffix(".tmp")
 
-        patch_dict = {}
+        nml_all = f90nml.read(nml_path)
 
-        for nml_name, nml_value in param_dict.items():
-            if nml_name == "turning_angle":
-                patch_dict["cosw"] = np.cos(nml_value * np.pi / 180.0)
-                patch_dict["sinw"] = np.sin(nml_value * np.pi / 180.0)
-            else:
-                patch_dict[nml_name] = nml_value
+        for group_name, group_value in param_dict.items():
+            if not isinstance(group_value, dict):
+                raise ValueError(
+                    f"Expected dict for {group_name}, got {type(group_value)}"
+                )
 
-        f90nml.patch(nml_path, patch_dict, nml_tmp_path)
-        os.rename(nml_tmp_path, nml_path)
+            if "turning_angle" in group_value:
+                turning_angle = group_value.pop("turning_angle")
+                if turning_angle == "REMOVE" or turning_angle is None:
+                    nml_all.setdefault(group_name, {}).pop("turning_angle", None)
+                    continue
+
+                if target_file.endswith(("cice_in.nml", "ice_in")):
+                    tmp = np.radians(turning_angle)
+                    cosw = np.cos(tmp)
+                    sinw = np.sin(tmp)
+
+                    if "dynamics_nml" not in nml_all:
+                        nml_all["dynamics_nml"] = {}
+
+                    nml_all["dynamics_nml"]["cosw"] = cosw
+                    nml_all["dynamics_nml"]["sinw"] = sinw
+
+            # Ensure the groupname exists
+            if group_name not in nml_all:
+                nml_all[group_name] = {}
+
+            for var, value in group_value.items():
+                if value == "REMOVE" or value is None:
+                    nml_all[group_name].pop(var, None)
+                else:
+                    nml_all[group_name][var] = value
+
+            # if not nml_all[group_name]:
+            #     nml_all.pop(group_name, None)
+
+        f90nml.write(nml_all, nml_tmp_path, force=True)
+        nml_tmp_path.replace(nml_path)
+
         format_nml_params(nml_path, param_dict)
 
 

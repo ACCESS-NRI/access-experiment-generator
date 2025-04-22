@@ -20,13 +20,19 @@ def write_yaml(data: dict, yaml_path: str) -> None:
         ryaml.dump(data, f)
 
 
-def update_config_entries(base: dict, change: dict) -> None:
+def update_config_entries(base: dict, change: dict, pop_key: bool = True) -> None:
     """
     Recursively update nuopc_runconfig and config.yaml entries.
     """
 
     for k, v in change.items():
-        if isinstance(v, dict) and k in base and isinstance(base[k], dict):
+        if v is None or v == "REMOVE":
+            if pop_key:
+                # Remove it immediately
+                base.pop(k, None)
+            else:
+                base[k] = None
+        elif isinstance(v, dict) and k in base and isinstance(base[k], dict):
             update_config_entries(base[k], v)
         else:
             base[k] = v
