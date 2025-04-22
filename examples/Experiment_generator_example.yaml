@@ -42,9 +42,5 @@ Perturbation_Experiment:
             ocean_nphysics_util_nml:
                 agm_closure_length: [2.5e4    , 7.5e4]
 
-    Parameter_block2:
-        Parameter_block2_branches: [test-nml1, test-nml2]
-        ...
-
-
-
+    # Parameter_block2:
+    #     Parameter_block2_branches: [test-nml1, test-nml2]
