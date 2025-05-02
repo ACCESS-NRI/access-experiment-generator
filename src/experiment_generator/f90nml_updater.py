@@ -14,8 +14,8 @@ class F90NamelistUpdater:
 
     def update_nml_params(
         self,
-        target_file: Path,
         param_dict: dict[str, dict[str, any]],
+        target_file: Path,
     ) -> None:
         """
         Updates namelist parameters based on the YAML configuration.
