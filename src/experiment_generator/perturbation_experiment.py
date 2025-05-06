@@ -1,3 +1,16 @@
+"""
+Perturbation Experiment Management
+
+It extends `ControlExperiment` to automate parameter sensitivity tests
+
+Key Components:
+- `ExperimentDefinition`: Dataclass encapsulating a single experiment setup.
+- `PerturbationExperiment.manage_perturb_expt()`: Orchestrates the end-to-end
+  perturbation workflow.
+- Internal helpers to flatten nested definitions, checkout/create branches, and
+  apply updates via specialized updaters.
+"""
+
 import warnings
 from dataclasses import dataclass
 from payu.branch import checkout_branch
@@ -11,6 +24,11 @@ BRANCH_SUFFIX = "_branches"
 class ExperimentDefinition:
     """
     Data class representing the definition of a perturbation experiment.
+
+    Attributes:
+        block_name (str): Top-level blocks (eg Parameter_block) from the YAML configuration.
+        branch_name (str): git branch name for this experiment.
+        file_params (dict): parameter dictionaries.
     """
 
     block_name: str
@@ -21,16 +39,22 @@ class ExperimentDefinition:
 class PerturbationExperiment(ControlExperiment):
     """
     Class to manage perturbation experiments by applying parameter sensitivity tests.
+      - Parsing nested YAML definitions into flat experiment configurations.
+      - Creating or checking out Git branches for each perturbation.
+      - Applying file-specific parameter updates using relevant updaters.
+      - Committing changes on each branch to record the perturbation setup.
     """
 
     def manage_perturb_expt(self) -> None:
         """
         Manage the overall perturbation experiment workflow:
-          - Validate provided perturbation configurations.
-          - Collect experiment definitions from the provided namelists.
-          - Check for existing local Git branches.
-          - Setup and update each experiment branch accordingly.
-          - Commit changes after updating experiment files.
+          1. Validate presence of perturbation data.
+          2. Collect flat list of ExperimentDefinition instances.
+          3. Check existing local Git branches.
+          4. Loop through each definition:
+             a. Set up the branch.
+             b. Update experiment files.
+             c. Commit modified files.
         """
         # main section, top level key that groups different namelists
         namelists = self.indata.get("Perturbation_Experiment")
@@ -103,7 +127,8 @@ class PerturbationExperiment(ControlExperiment):
         self, nested_dict: dict, indx: int, total_exps: int
     ) -> dict:
         """
-        Recursively extract run-specific parameters from a nested dictionary.
+        Recursively extract parameters for a specific run index from nested structures.
+        Handles dicts, lists of scalars, lists of lists, and lists of dicts.
         """
         result = {}
         for key, value in nested_dict.items():
@@ -192,7 +217,7 @@ class PerturbationExperiment(ControlExperiment):
 
     def _update_experiment_files(self, expt_def: ExperimentDefinition) -> None:
         """
-        Update experiment configuration files based on the provided file parameters.
+        Apply file-specific parameter updates based on the provided file parameters.
         """
         for filename, params in expt_def.file_params.items():
             if filename.endswith("_in") or filename.endswith(".nml"):
