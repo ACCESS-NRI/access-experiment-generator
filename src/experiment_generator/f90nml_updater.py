@@ -1,4 +1,12 @@
-import os
+"""
+Fortran Namelist Updater.
+
+This module provides functionality for updating F90namelist
+files (`*.nml` or `*_in`) based on values defined in a YAML configuration.
+It supports parameter additions, updates, deletions, and specific logic
+(e.g. calculating cos/sin of a turning angle for CICE models).
+"""
+
 from pathlib import Path
 import numpy as np
 import f90nml
@@ -18,18 +26,15 @@ class F90NamelistUpdater:
         target_file: Path,
     ) -> None:
         """
-        Updates namelist parameters based on the YAML configuration.
+        Updates namelist parameters based on the YAML input file.
 
         Args:
-            target_file (Path): Path to the namelist file, relative to `self.directory`.
             param_dict (dict[str, dict[str, any]]):
-                Mapping from namelist section names to
-                dictionaries of variable names to new values.
-
-                Use value=None or "REMOVE" to delete a variable.
-
-                Special key "turning_angle" will generate
-                "cosw" and "sinw" entries in the "dynamics_nml" section.
+                1. Mapping from namelist section names to parameter-value pairs.
+                2. Use value=None or "REMOVE" to delete a variable.
+                3. Special handling for "turning_angle": computes "cosw" and "sinw"
+                   and inserts them into the `dynamics_nml` block.
+            target_file (Path): Path to the namelist file, relative to `self.directory`.
         """
         nml_path = self.directory / target_file
         nml_tmp_path = nml_path.with_suffix(".tmp")
@@ -63,24 +68,23 @@ class F90NamelistUpdater:
             if group_name not in nml_all:
                 nml_all[group_name] = {}
 
+            # Update or remove variables
             for var, value in group_value.items():
                 if value == "REMOVE" or value is None:
                     nml_all[group_name].pop(var, None)
                 else:
                     nml_all[group_name][var] = value
 
-            # if not nml_all[group_name]:
-            #     nml_all.pop(group_name, None)
-
         f90nml.write(nml_all, nml_tmp_path, force=True)
         nml_tmp_path.replace(nml_path)
 
+        # Postprocessing to ensure proper formatting
         format_nml_params(nml_path, param_dict)
 
 
 def format_nml_params(nml_path: str, param_dict: dict) -> None:
     """
-    Ensures proper formatting in the namelist file.
+    Ensure proper formatting in the namelist file, particularly for booleans and list-like strings.
 
     This method correctly formats boolean values and ensures Fortran syntax
     is preserved when updating parameters.
@@ -89,7 +93,7 @@ def format_nml_params(nml_path: str, param_dict: dict) -> None:
         nml_path (str): The path to specific f90 namelist file.
         param_dict (dict): The dictionary of parameters to update.
     Example:
-        YAML input:
+        YAML input file:
             ocean/input.nml:
                 mom_oasis3_interface_nml:
                     fields_in: "'u_flux', 'v_flux', 'lprec'"
