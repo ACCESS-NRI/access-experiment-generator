@@ -14,7 +14,7 @@ class BaseExperiment:
         self.dir_manager = Path.cwd()
 
         # General experiment setup
-        self.test_path = indata.get("test_path", "experiment_generator_test_path")
+        self.test_path = Path(indata.get("test_path", "experiment_generator_test_path"))
         self.model_type = indata.get("model_type", False)
 
         # Repository setup
