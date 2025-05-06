@@ -1,4 +1,3 @@
-import os
 from payu.branch import clone
 from .control_experiment import ControlExperiment
 from .perturbation_experiment import PerturbationExperiment
@@ -43,10 +42,10 @@ class ExperimentGenerator(BaseExperiment):
         """
         Creates the test directory if it doesn't exist.
         """
-        if os.path.exists(self.test_path):
+        if self.test_path.exists():
             print(f"-- Test directory {self.test_path} already exists!")
         else:
-            os.makedirs(self.test_path)
+            self.test_path.mkdir(parents=True, exist_ok=True)
             print(f"-- Test directory {self.test_path} has been created!")
 
     def _validate_model_type(self) -> None:

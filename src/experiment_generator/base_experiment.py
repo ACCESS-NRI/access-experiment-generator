@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 
@@ -12,7 +11,7 @@ class BaseExperiment:
 
     def __init__(self, indata: dict) -> None:
         self.indata = indata
-        self.dir_manager = os.getcwd()
+        self.dir_manager = Path.cwd()
 
         # General experiment setup
         self.test_path = indata.get("test_path", "experiment_generator_test_path")
