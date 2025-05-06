@@ -9,7 +9,7 @@ from .base_experiment import BaseExperiment
 class ControlExperiment(BaseExperiment):
     """
     Manages the control experiment by updating configuration files and committing changes
-    to a Git repository based on a provided YAML configuration.
+    to a Git repository based on a provided YAML input file.
     """
 
     def __init__(self, directory, indata) -> None:
@@ -17,7 +17,7 @@ class ControlExperiment(BaseExperiment):
         self.directory = directory
         self.gitrepository = GitRepository(directory)
 
-        # updater for each configuration file
+        # initialise updater for each configuration file
         self.f90namelistupdater = F90NamelistUpdater(directory)
         self.configupdater = ConfigUpdater(directory)
         self.nuopcrunconfigupdater = NuopcRunConfigUpdater(directory)
@@ -25,21 +25,21 @@ class ControlExperiment(BaseExperiment):
     # control experiment
     def setup_control_expt(self) -> None:
         """
-        Modifies parameters based on the YAML configuration.
+        Set up the control experiment by updating parameters defined
+        in the YAML configuration.
 
-        Updates configuration files:
+        Supported configuration files:
             - `config.yaml`
-            - f90 namelist files (`*.in`, `*.nml`)
+            - Fortran namelists (*.nml, *_in)
             - `nuopc.runconfig`
-            - `MOM_input`
-            - `nuopc.runseq`
-            - XML files (`*.xml`)
+            - (Future support) MOM_input, nuopc.runseq, field_table, XML files
+
+        After updates, changes are committed to the Git repository.
         """
-        exclude_dirs = {".git", ".github", "testing", "docs"}
         control_data = self.indata.get("Control_Experiment")
 
         if not control_data:
-            raise ValueError("No control experiment data provided!")
+            raise ValueError("No control experiment data found in YAML input file!")
 
         if self.control_branch_name in {
             i.name for i in self.gitrepository.repo.branches
@@ -52,10 +52,15 @@ class ControlExperiment(BaseExperiment):
                 config_path=self.directory / "config.yaml",
             )
 
+        exclude_dirs = {".git", ".github", "testing", "docs"}
+
+        # Iterate over all files and apply updates if matched in control_data
         for file in self.directory.rglob("*"):
             if any(part in exclude_dirs for part in file.parts):
                 continue
+
             target_file = file.relative_to(self.directory)
+
             # eg, ice/cice_in.nml or ice_in.nml
             yaml_data = control_data.get(str(target_file))
 
@@ -74,7 +79,7 @@ class ControlExperiment(BaseExperiment):
                         yaml_data, target_file
                     )
 
-        # git commit the modified files, if nothing changed, no commit will be made.
+        # git commit only if files were actually modified
         modified_files = [
             item.a_path for item in self.gitrepository.repo.index.diff(None)
         ]
