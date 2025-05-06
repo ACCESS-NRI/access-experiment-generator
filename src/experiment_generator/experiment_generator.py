@@ -10,10 +10,22 @@ VALID_MODELS = ("access-om2", "access-om3")
 
 class ExperimentGenerator(BaseExperiment):
     """
-    Handles setup, cloning, and running control & perturbation experiments.
+    Main class for setting up and managing ACCESS experiments.
+
+    This class coordinates the full experiment lifecycle, including:
+    - Validating model type
+    - Cloning necessary repositories
+    - Running control experiments
+    - Running perturbation experiments (if enabled)
     """
 
     def __init__(self, indata: dict):
+        """
+        Initialise the ExperimentGenerator with parsed input configuration.
+
+        Args:
+            indata (dict): Dictionary containing input settings from the YAML input.
+        """
         super().__init__(indata)
 
     def run(self) -> None:
@@ -39,7 +51,7 @@ class ExperimentGenerator(BaseExperiment):
 
     def _validate_model_type(self) -> None:
         """
-        Ensures the model type is correct.
+        Ensures the model type is supported.
         """
         if self.model_type not in VALID_MODELS:
             raise ValueError(f"{self.model_type} must be either {VALID_MODELS}!")
