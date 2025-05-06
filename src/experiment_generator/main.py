@@ -12,7 +12,7 @@ def main():
     and invokes the ExperimentGenerator to produce the required setups.
 
     Command-line Arguments:
-        --input-yaml-file (str, optional): 
+        --input-yaml-file (str, optional):
             Path to the YAML file specifying parameter values for the experiment runs.
             Defaults to 'Experiment_manager.yaml'.
     """
@@ -33,15 +33,15 @@ def main():
         help=(
             "Path to the YAML file specifying parameter values for experiment runs.\n"
             "If not provided, defaults to 'Experiment_manager.yaml'."
-            )
-        )
+        ),
+    )
 
     args = parser.parse_args()
 
     # Load the YAML file
     input_yaml = args.input_yaml_file
     indata = read_yaml(input_yaml)
-    
+
     # Run the experiment generator
     generator = ExperimentGenerator(indata)
     generator.run()

@@ -1,7 +1,7 @@
 """
 Utility module
 
-This module provides helper functions, 
+This module provides helper functions,
 - `read_yaml`: Load a YAML file into a Python dictionary with preserved quotes.
 - `write_yaml`: Dump a Python dictionary back to a YAML file, maintaining format.
 - `update_config_entries`: Recursively apply updates or removals to nested dictionaries.
