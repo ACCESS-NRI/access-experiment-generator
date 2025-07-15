@@ -1,5 +1,4 @@
 from payu.branch import clone
-from .control_experiment import ControlExperiment
 from .perturbation_experiment import PerturbationExperiment
 from .base_experiment import BaseExperiment
 
@@ -34,9 +33,10 @@ class ExperimentGenerator(BaseExperiment):
         self._create_test_path()
         self._validate_model_type()
         self._clone_repository()
-        self._run_control_experiment()
+        experiment = PerturbationExperiment(self.directory, self.indata)
+        experiment.manage_control_expt()
         if self.perturbation_enabled:
-            self._run_perturbation_experiment()
+            experiment.manage_perturb_expt()
 
     def _create_test_path(self) -> None:
         """
@@ -77,17 +77,3 @@ class ExperimentGenerator(BaseExperiment):
                 parent_experiment=self.parent_experiment,
                 start_point=self.start_point,
             )
-
-    def _run_control_experiment(self) -> None:
-        """
-        Runs the control experiment.
-        """
-        control_experiment = ControlExperiment(self.directory, self.indata)
-        control_experiment.setup_control_expt()
-
-    def _run_perturbation_experiment(self) -> None:
-        """
-        Runs the perturbation experiment if enabled.
-        """
-        perturbation_experiment = PerturbationExperiment(self.directory, self.indata)
-        perturbation_experiment.manage_perturb_expt()

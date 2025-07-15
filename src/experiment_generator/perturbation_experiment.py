@@ -1,21 +1,14 @@
-"""
-Perturbation Experiment Management
-
-It extends `ControlExperiment` to automate parameter sensitivity tests
-
-Key Components:
-- `ExperimentDefinition`: Dataclass encapsulating a single experiment setup.
-- `PerturbationExperiment.manage_perturb_expt()`: Orchestrates the end-to-end
-  perturbation workflow.
-- Internal helpers to flatten nested definitions, checkout/create branches, and
-  apply updates via specialized updaters.
-"""
-
 import warnings
+from pathlib import Path
 from dataclasses import dataclass
 from payu.branch import checkout_branch
-from .control_experiment import ControlExperiment
-
+from .base_experiment import BaseExperiment
+from payu.git_utils import GitRepository
+from .f90nml_updater import F90NamelistUpdater
+from .config_updater import ConfigUpdater
+from .nuopc_runconfig_updater import NuopcRunConfigUpdater
+from .mom6_input_updater import Mom6InputUpdater
+from .nuopc_runseq_updater import NuopcRunseqUpdater
 
 BRANCH_SUFFIX = "_branches"
 
@@ -36,7 +29,7 @@ class ExperimentDefinition:
     file_params: dict[str, dict]
 
 
-class PerturbationExperiment(ControlExperiment):
+class PerturbationExperiment(BaseExperiment):
     """
     Class to manage perturbation experiments by applying parameter sensitivity tests.
       - Parsing nested YAML definitions into flat experiment configurations.
@@ -44,6 +37,72 @@ class PerturbationExperiment(ControlExperiment):
       - Applying file-specific parameter updates using relevant updaters.
       - Committing changes on each branch to record the perturbation setup.
     """
+
+    def __init__(self, directory: str | Path, indata: dict) -> None:
+        super().__init__(indata)
+        self.directory = Path(directory)
+        self.gitrepository = GitRepository(self.directory)
+
+        # updater for each configuration file
+        self.f90namelistupdater = F90NamelistUpdater(directory)
+        self.configupdater = ConfigUpdater(directory)
+        self.nuopcrunconfigupdater = NuopcRunConfigUpdater(directory)
+        self.mom6inputupdater = Mom6InputUpdater(directory)
+        self.nuopcrunsequpdater = NuopcRunseqUpdater(directory)
+
+    def _apply_updates(self, file_params: dict[str, dict]) -> None:
+        """
+        Apply a dict of `{filename: parameters}` to different config files.
+        """
+        for filename, params in file_params.items():
+            if filename.endswith("_in") or filename.endswith(".nml"):
+                self.f90namelistupdater.update_nml_params(params, filename)
+            elif filename == "config.yaml":
+                self.configupdater.update_config_params(params, filename)
+            elif filename == "nuopc.runconfig":
+                self.nuopcrunconfigupdater.update_runconfig_params(params, filename)
+            elif filename == "MOM_input":
+                self.mom6inputupdater.update_mom6_params(params, filename)
+            elif filename == "nuopc.runseq":
+                self.nuopcrunsequpdater.update_nuopc_runseq(params, filename)
+
+    def manage_control_expt(self) -> None:
+        """
+        Update files for the control branch (name held in `self.control_branch_name`).
+        """
+        control_data = self.indata.get("Control_Experiment")
+        if not control_data:
+            raise ValueError(
+                "No Control_Experiment block provided in the input yaml file."
+            )
+
+        # Ensure we are on the control branch
+        branch_names = {i.name for i in self.gitrepository.repo.branches}
+        if self.control_branch_name in branch_names:
+            checkout_branch(
+                branch_name=self.control_branch_name,
+                is_new_branch=False,
+                start_point=self.control_branch_name,
+                config_path=self.directory / "config.yaml",
+            )
+
+        # Walk the repo, skipping un-interesting dirs
+        exclude_dirs = {".git", ".github", "testing", "docs"}
+        for file in self.directory.rglob("*"):
+            if any(part in exclude_dirs for part in file.parts):
+                continue
+            rel_path = file.relative_to(self.directory)
+            # eg, ice/cice_in.nml or ice_in.nml
+            yaml_data = control_data.get(str(rel_path))
+            if yaml_data:
+                self._apply_updates({str(rel_path): yaml_data})
+
+        # Commit if anything actually changed
+        modified_files = [
+            item.a_path for item in self.gitrepository.repo.index.diff(None)
+        ]
+        commit_message = f"Updated control files: {modified_files}"
+        self.gitrepository.commit(commit_message, modified_files)
 
     def manage_perturb_expt(self) -> None:
         """
@@ -74,7 +133,7 @@ class PerturbationExperiment(ControlExperiment):
         # setup each experiment (create branch names and print actions)
         for expt_def in experiment_definitions:
             self._setup_branch(expt_def, local_branches)
-            self._update_experiment_files(expt_def)
+            self._apply_updates(expt_def.file_params)
 
             modified_files = [
                 item.a_path for item in self.gitrepository.repo.index.diff(None)
@@ -214,17 +273,3 @@ class PerturbationExperiment(ControlExperiment):
                 lab_path=self.lab_path,
                 parent_experiment=self.parent_experiment,
             )
-
-    def _update_experiment_files(self, expt_def: ExperimentDefinition) -> None:
-        """
-        Apply file-specific parameter updates based on the provided file parameters.
-        """
-        for filename, params in expt_def.file_params.items():
-            if filename.endswith("_in") or filename.endswith(".nml"):
-                self.f90namelistupdater.update_nml_params(params, filename)
-
-            elif filename == "config.yaml":
-                self.configupdater.update_config_params(params, filename)
-
-            elif filename == "nuopc.runconfig":
-                self.nuopcrunconfigupdater.update_runconfig_params(params, filename)
