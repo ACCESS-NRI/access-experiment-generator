@@ -1,12 +1,12 @@
 [project]
 name = "experiment-generator"
-version = "0.1.0"
+dynamic = ["version"]
 description = "A tool to generate and manage parameter sensitivity experiments."
 authors = [
   { name = "Minghang Li", email = "Minghang.Li1@anu.edu.au" }
 ]
 readme = "README.md"
-keywords = ["experiment generator", "workflow", "payu"]
+keywords = ["experiment generator", "workflow", "access", "payu"]
 license = { text = "Apache-2.0" }
 classifiers = [
     "License :: OSI Approved :: Apache Software License",
@@ -14,12 +14,44 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Topic :: Utilities",
 ]
-# As payu is pre-installed (via modules), this can be omitted.
-dependencies = []
+
+dependencies = [
+  "ruamel.yaml",
+  "f90nml"
+]
+
+[build-system]
+requires = ["setuptools", "setuptools_scm[toml]", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+write_to = "src/experiment_generator/_version.py"
 
 [project.scripts]
 experiment-generator = "experiment_generator.main:main"
 
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
+[project.optional-dependencies]
+devel = [
+    "flake8",
+    "black",
+    "pre-commit",
+]
+test = [
+    "pytest",
+    "pytest-cov",
+]
+
+access = ["payu"]
+
+[tool.pytest.ini_options]
+addopts = ["--cov=src/experiment_generator", "--cov-report=term", "--cov-report=html", "--cov-report=xml"]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+omit = ["src/experiment_generator/_version.py"]
+
+[tool.black]
+line-length = 120
+
+[tool.flake8]
+max-line-length = 120

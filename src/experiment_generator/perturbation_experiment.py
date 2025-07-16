@@ -72,9 +72,7 @@ class PerturbationExperiment(BaseExperiment):
         """
         control_data = self.indata.get("Control_Experiment")
         if not control_data:
-            raise ValueError(
-                "No Control_Experiment block provided in the input yaml file."
-            )
+            raise ValueError("No Control_Experiment block provided in the input yaml file.")
 
         # Ensure we are on the control branch
         branch_names = {i.name for i in self.gitrepository.repo.branches}
@@ -98,9 +96,7 @@ class PerturbationExperiment(BaseExperiment):
                 self._apply_updates({str(rel_path): yaml_data})
 
         # Commit if anything actually changed
-        modified_files = [
-            item.a_path for item in self.gitrepository.repo.index.diff(None)
-        ]
+        modified_files = [item.a_path for item in self.gitrepository.repo.index.diff(None)]
         commit_message = f"Updated control files: {modified_files}"
         self.gitrepository.commit(commit_message, modified_files)
 
@@ -135,15 +131,11 @@ class PerturbationExperiment(BaseExperiment):
             self._setup_branch(expt_def, local_branches)
             self._apply_updates(expt_def.file_params)
 
-            modified_files = [
-                item.a_path for item in self.gitrepository.repo.index.diff(None)
-            ]
+            modified_files = [item.a_path for item in self.gitrepository.repo.index.diff(None)]
             commit_message = f"Updated perturbation files: {modified_files}"
             self.gitrepository.commit(commit_message, modified_files)
 
-    def _collect_experiment_definitions(
-        self, namelists: dict
-    ) -> list[ExperimentDefinition]:
+    def _collect_experiment_definitions(self, namelists: dict) -> list[ExperimentDefinition]:
         """
         Collects and returns a list of experiment definitions based on provided perturbation namelists.
         """
@@ -160,16 +152,12 @@ class PerturbationExperiment(BaseExperiment):
             total_exps = len(branch_names)
 
             # all other keys hold file-specific parameter configurations
-            file_params_all = {
-                k: v for k, v in blockcontents.items() if k != branch_keys
-            }
+            file_params_all = {k: v for k, v in blockcontents.items() if k != branch_keys}
 
             for indx, branch_name in enumerate(branch_names):
                 single_run_file_params = {}
                 for filename, param_dict in file_params_all.items():
-                    run_specific_params = self._extract_run_specific_params(
-                        param_dict, indx, total_exps
-                    )
+                    run_specific_params = self._extract_run_specific_params(param_dict, indx, total_exps)
                     single_run_file_params[filename] = run_specific_params
 
                 experiment_definitions.append(
@@ -182,9 +170,7 @@ class PerturbationExperiment(BaseExperiment):
 
         return experiment_definitions
 
-    def _extract_run_specific_params(
-        self, nested_dict: dict, indx: int, total_exps: int
-    ) -> dict:
+    def _extract_run_specific_params(self, nested_dict: dict, indx: int, total_exps: int) -> dict:
         """
         Recursively extract parameters for a specific run index from nested structures.
         Handles dicts, lists of scalars, lists of lists, and lists of dicts.
@@ -199,10 +185,7 @@ class PerturbationExperiment(BaseExperiment):
                 # if it's a list of dicts (e.g., for submodels in `config.yaml` in OM2)
                 if len(value) > 0 and all(isinstance(i, dict) for i in value):
                     # process each dict in the list for the given column indx
-                    tmp = [
-                        self._extract_run_specific_params(i, indx, total_exps)
-                        for i in value
-                    ]
+                    tmp = [self._extract_run_specific_params(i, indx, total_exps) for i in value]
                     if all(i == tmp[0] for i in tmp):
                         result[key] = tmp[0]
                     else:
@@ -223,9 +206,7 @@ class PerturbationExperiment(BaseExperiment):
                     result[key] = new_list
                 else:
                     # Plain list: if it has one element or all elements are identical, broadcast that element.
-                    if len(value) == 1 or (
-                        len(value) > 1 and all(i == value[0] for i in value)
-                    ):
+                    if len(value) == 1 or (len(value) > 1 and all(i == value[0] for i in value)):
                         result[key] = value[0]
                     else:
                         if len(value) != total_exps:
@@ -238,9 +219,7 @@ class PerturbationExperiment(BaseExperiment):
                 result[key] = value
         return result
 
-    def _setup_branch(
-        self, expt_def: ExperimentDefinition, local_branches: dict
-    ) -> None:
+    def _setup_branch(self, expt_def: ExperimentDefinition, local_branches: dict) -> None:
         """
         Set up the Git branch for a perturbation experiment based on its definition.
         """
@@ -248,9 +227,7 @@ class PerturbationExperiment(BaseExperiment):
         branch_existed = expt_def.branch_name in local_branches
 
         if branch_existed:
-            print(
-                f"-- Branch {expt_def.branch_name} already exists, switching to it only!"
-            )
+            print(f"-- Branch {expt_def.branch_name} already exists, switching to it only!")
             checkout_branch(
                 branch_name=expt_def.branch_name,
                 is_new_branch=False,
@@ -258,9 +235,7 @@ class PerturbationExperiment(BaseExperiment):
                 config_path=self.directory / "config.yaml",
             )
         else:
-            print(
-                f"-- Creating branch {expt_def.branch_name} from {self.control_branch_name}!"
-            )
+            print(f"-- Creating branch {expt_def.branch_name} from {self.control_branch_name}!")
             checkout_branch(
                 branch_name=expt_def.branch_name,
                 is_new_branch=True,

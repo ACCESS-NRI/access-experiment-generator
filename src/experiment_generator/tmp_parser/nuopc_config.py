@@ -121,9 +121,7 @@ def read_nuopc_config(file_name: str) -> dict:
 
                 elif re.match(label_value_pattern, line):
                     match = re.match(label_value_pattern, line)
-                    config[match.group(1)] = [
-                        convert_from_string(string) for string in match.group(2).split()
-                    ]
+                    config[match.group(1)] = [convert_from_string(string) for string in match.group(2).split()]
 
     return config
 

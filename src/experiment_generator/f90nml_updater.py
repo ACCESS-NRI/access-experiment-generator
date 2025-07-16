@@ -43,9 +43,7 @@ class F90NamelistUpdater:
 
         for group_name, group_value in param_dict.items():
             if not isinstance(group_value, dict):
-                raise ValueError(
-                    f"Expected dict for {group_name}, got {type(group_value)}"
-                )
+                raise ValueError(f"Expected dict for {group_name}, got {type(group_value)}")
 
             if "turning_angle" in group_value:
                 turning_angle = group_value.pop("turning_angle")

@@ -76,9 +76,7 @@ def write_mom_input(
             new_rhs = _format_conversion(params[name])
             lhs = f"{indent}{name} = {new_rhs}"
             if comment:
-                lhs = (
-                    lhs.ljust(comm_width) + " !   " + comment.lstrip("! ").rstrip("\n")
-                )
+                lhs = lhs.ljust(comm_width) + " !   " + comment.lstrip("! ").rstrip("\n")
             out.append(lhs + "\n")
             align_comment = True
             continue
