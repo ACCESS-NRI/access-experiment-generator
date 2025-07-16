@@ -1,7 +1,7 @@
 import shutil
 import pytest
 
-from src.experiment_generator.experiment_generator import (
+from experiment_generator.experiment_generator import (
     ExperimentGenerator,
     VALID_MODELS,
 )
@@ -96,7 +96,7 @@ def test_clone_repository(tmp_path, monkeypatch):
         clone["clone_called"] = True
         clone["clone_kwargs"] = kwargs
 
-    monkeypatch.setattr("src.experiment_generator.experiment_generator.clone", mock_clone)
+    monkeypatch.setattr("experiment_generator.experiment_generator.clone", mock_clone)
 
     # directory not exist now
     if generator.directory.exists():
@@ -145,7 +145,7 @@ def test_run_control_optional_perturb(monkeypatch):
             call["perturb"] = True
 
     monkeypatch.setattr(
-        "src.experiment_generator.experiment_generator.PerturbationExperiment",
+        "experiment_generator.experiment_generator.PerturbationExperiment",
         DummyPerturbationExperiment,
     )
 

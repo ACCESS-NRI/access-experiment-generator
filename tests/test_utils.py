@@ -2,7 +2,7 @@ import os
 import warnings
 import pytest
 
-from src.experiment_generator import utils
+from experiment_generator import utils
 
 
 def test_update_config_entries_basic_changes_with_pop_key():
