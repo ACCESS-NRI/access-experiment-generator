@@ -1,0 +1,58 @@
+name: CI for access-exeperiment-generator
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+  workflow_dispatch:
+
+jobs:
+  formatting:
+    name: code formatting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: check formatting with black
+        uses: psf/black@stable
+        with:
+          options: "--check --verbose --diff"
+          src: "./src/experiment_generator ./tests"
+
+
+  test-build:
+    needs: formatting
+
+    name: test build
+    runs-on: ubuntu-latest
+
+    # Run the job for different versions of python
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install '.[devel,test]'
+      - name: Lint with flake8
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      - name: Run tests
+        run: pytest --cov=experiment_generator --cov-report=xml
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
