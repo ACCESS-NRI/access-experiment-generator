@@ -1,3 +1,11 @@
+# access-experiment-generator
+
+[![CI](https://github.com/ACCESS-NRI/access-experiment-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/ACCESS-NRI/access-experiment-generator/actions/workflows/ci.yml)
+[![Coverage Status](https://codecov.io/gh/ACCESS-NRI/access-experiment-generator/branch/main/graph/badge.svg)](https://codecov.io/gh/ACCESS-NRI/access-experiment-generator)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](https://opensource.org/license/apache-2-0) 
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
+
 # About
 The main role of the ACCESS experiment generator is to streamline the creation of one or more experiment configurations from a "control" experiment setup. It reduces manual editing and ensures consistent, repeatable workflows for large ensembles. 
 
