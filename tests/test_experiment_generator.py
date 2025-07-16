@@ -96,9 +96,7 @@ def test_clone_repository(tmp_path, monkeypatch):
         clone["clone_called"] = True
         clone["clone_kwargs"] = kwargs
 
-    monkeypatch.setattr(
-        "src.experiment_generator.experiment_generator.clone", mock_clone
-    )
+    monkeypatch.setattr("src.experiment_generator.experiment_generator.clone", mock_clone)
 
     # directory not exist now
     if generator.directory.exists():
