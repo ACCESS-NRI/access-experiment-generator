@@ -1,5 +1,5 @@
 from pathlib import Path
-from src.experiment_generator.base_experiment import BaseExperiment
+from experiment_generator.base_experiment import BaseExperiment
 
 
 def test_base_experiment_defaults_and_paths(tmp_path):
