@@ -83,12 +83,6 @@ def write_mom_input(
 
         # section/tag line
         if _REG_TAG.match(stripped):
-            # tag removed
-            if stripped not in params:
-                skip_comment_block = True
-                align_comment = False
-                continue
-            # tag kept
             out.append(ln)
             continue
 
