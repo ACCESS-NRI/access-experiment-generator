@@ -1,7 +1,7 @@
 import sys
 import pytest
 from pathlib import Path
-from tests.conftest import DummyBranch
+from conftest import DummyBranch
 from experiment_generator.perturbation_experiment import PerturbationExperiment as pert_exp
 from experiment_generator.perturbation_experiment import ExperimentDefinition as ed
 
