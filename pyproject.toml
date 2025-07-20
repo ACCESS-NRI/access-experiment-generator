@@ -59,7 +59,10 @@ addopts = [
 testpaths = ["tests"]
 
 [tool.coverage.run]
-omit = ["src/experiment_generator/_version.py"]
+omit = [
+  "src/experiment_generator/_version.py",
+  "src/experiment_generator/tmp_parser/*"
+  ]
 
 [tool.black]
 line-length = 120
