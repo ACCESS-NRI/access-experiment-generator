@@ -28,5 +28,16 @@ class NuopcRunseqUpdater:
         nml_path = self.directory / target_file
 
         raw_lines = read_runseq(nml_path)
-        modifies_lines = modify_runseq(raw_lines, old_val="1080", new_val=param_dict["cpl_dt"])
+
+        old_val = None
+        for line in raw_lines:
+            stripped = line.strip()
+            if stripped.startswith("@") and stripped[1:].isdigit():
+                old_val = stripped[1:]
+                break
+
+        if old_val is None:
+            raise ValueError("Could not find a line beginning with '@<number>'in nuopc.runseq file")
+
+        modifies_lines = modify_runseq(raw_lines, old_val=old_val, new_val=param_dict["cpl_dt"])
         write_runseq(modifies_lines, nml_path)
