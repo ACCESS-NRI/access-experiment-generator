@@ -2,7 +2,7 @@ import os
 import warnings
 import pytest
 
-from experiment_generator import utils
+from experiment_generator.utils import update_config_entries
 
 
 def test_update_config_entries_basic_changes_with_pop_key():
@@ -30,7 +30,7 @@ def test_update_config_entries_basic_changes_with_pop_key():
         "d": 7,
     }
 
-    utils.update_config_entries(base, changes)
+    update_config_entries(base, changes)
     assert base == expected
 
 
@@ -54,7 +54,7 @@ def test_update_config_entries_no_pop_key():
         "b": None,
     }
 
-    utils.update_config_entries(base, changes, pop_key=False)
+    update_config_entries(base, changes, pop_key=False)
     assert base == expected
 
 
@@ -87,5 +87,5 @@ def test_update_config_entries_nested():
         # "a" removed
     }
 
-    utils.update_config_entries(base, changes)
+    update_config_entries(base, changes)
     assert base == expected
