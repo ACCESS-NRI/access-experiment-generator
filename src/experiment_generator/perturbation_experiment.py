@@ -9,6 +9,7 @@ from .config_updater import ConfigUpdater
 from .nuopc_runconfig_updater import NuopcRunConfigUpdater
 from .mom6_input_updater import Mom6InputUpdater
 from .nuopc_runseq_updater import NuopcRunseqUpdater
+from .om2_forcing_updater import Om2ForcingUpdater
 
 BRANCH_KEY = "branches"
 
@@ -49,6 +50,7 @@ class PerturbationExperiment(BaseExperiment):
         self.nuopcrunconfigupdater = NuopcRunConfigUpdater(directory)
         self.mom6inputupdater = Mom6InputUpdater(directory)
         self.nuopcrunsequpdater = NuopcRunseqUpdater(directory)
+        self.om2forcingupdater = Om2ForcingUpdater(directory)
 
     def _apply_updates(self, file_params: dict[str, dict]) -> None:
         """
@@ -65,6 +67,8 @@ class PerturbationExperiment(BaseExperiment):
                 self.mom6inputupdater.update_mom6_params(params, filename)
             elif filename == "nuopc.runseq":
                 self.nuopcrunsequpdater.update_nuopc_runseq(params, filename)
+            elif filename == "atmosphere/forcing.json":
+                self.om2forcingupdater.update_forcing_params(params, filename)
 
     def manage_control_expt(self) -> None:
         """
