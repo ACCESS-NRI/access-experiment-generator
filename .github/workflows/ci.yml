@@ -51,7 +51,7 @@ jobs:
       - name: Run tests with coverage
         run: |
           python3 -m pytest -s \
-            --cov=./src \
+            --cov=experiment_generator \
             --cov-branch \
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml \
