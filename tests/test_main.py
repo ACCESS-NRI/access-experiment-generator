@@ -1,6 +1,4 @@
-from pathlib import Path
 import sys
-import pytest
 import experiment_generator.main as main_module
 
 VALID_MODELS = ["access-om2", "access-om3"]

@@ -1,4 +1,3 @@
-import sys
 import pytest
 from pathlib import Path
 from experiment_generator.config_updater import ConfigUpdater

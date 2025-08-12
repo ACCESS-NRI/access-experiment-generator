@@ -1,4 +1,3 @@
-from pathlib import Path
 from experiment_generator.mom6_input_updater import Mom6InputUpdater
 from experiment_generator.tmp_parser.mom6_input import read_mom_input
 

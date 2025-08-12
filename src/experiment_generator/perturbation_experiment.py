@@ -200,7 +200,8 @@ class PerturbationExperiment(BaseExperiment):
                         else:
                             if len(row) != total_exps:
                                 raise ValueError(
-                                    f"For key '{key}', the inner list length {len(row)}, but the total experiment {total_exps}"
+                                    f"For key '{key}', the inner list length {len(row)}, but the "
+                                    f"total experiment {total_exps}"
                                 )
                             new_list.append(row[indx])
                     result[key] = new_list
@@ -211,7 +212,8 @@ class PerturbationExperiment(BaseExperiment):
                     else:
                         if len(value) != total_exps:
                             raise ValueError(
-                                f"For key '{key}', the inner list length {len(value)}, but the total experiment {total_exps}"
+                                f"For key '{key}', the inner list length {len(value)}, but the "
+                                f"total experiment {total_exps}"
                             )
                         result[key] = value[indx]
             # Scalar, string, etc so return as is
