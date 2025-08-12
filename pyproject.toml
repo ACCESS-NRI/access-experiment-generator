@@ -21,11 +21,8 @@ dependencies = [
 ]
 
 [build-system]
-requires = ["setuptools", "setuptools_scm[toml]", "wheel"]
+requires = ["setuptools>=80", "setuptools_scm[toml]>=8", "wheel"]
 build-backend = "setuptools.build_meta"
-
-[tool.setuptools_scm]
-write_to = "src/experiment_generator/_version.py"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -60,7 +57,6 @@ testpaths = ["tests"]
 
 [tool.coverage.run]
 omit = [
-  "src/experiment_generator/_version.py",
   "src/experiment_generator/tmp_parser/*"
   ]
 
