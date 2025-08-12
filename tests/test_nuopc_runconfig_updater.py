@@ -1,5 +1,3 @@
-from pathlib import Path
-import yaml
 from experiment_generator.nuopc_runconfig_updater import NuopcRunConfigUpdater
 from experiment_generator.tmp_parser.nuopc_config import read_nuopc_config
 
@@ -13,7 +11,7 @@ def test_update_runconfig_params_updates_and_removes(tmp_path):
     runconfig_path.write_text(
         """
 PELAYOUT_attributes::
-     atm_ntasks = 364 
+     atm_ntasks = 364
      atm_nthreads = 2
      atm_pestride = 2
      atm_rootpe = 0

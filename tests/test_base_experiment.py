@@ -1,4 +1,3 @@
-import pytest
 from pathlib import Path
 from experiment_generator.base_experiment import BaseExperiment
 

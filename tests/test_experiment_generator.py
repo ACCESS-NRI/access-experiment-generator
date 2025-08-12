@@ -1,5 +1,4 @@
 import pytest
-from pathlib import Path
 import sys
 from experiment_generator.experiment_generator import ExperimentGenerator as eg, VALID_MODELS
 
