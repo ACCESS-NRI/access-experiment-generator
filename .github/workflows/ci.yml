@@ -21,7 +21,6 @@ jobs:
           options: "--check --verbose --diff"
           src: "./src/experiment_generator ./tests"
 
-
   test-build:
     needs: formatting
 
@@ -40,7 +39,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip'
+          cache: "pip"
       - name: Install dependencies
         run: |
           python3 -m pip install --upgrade pip
@@ -49,10 +48,16 @@ jobs:
         run: |
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-      - name: Run tests
-        run: PYTHONPATH=src pytest --cov=experiment_generator --cov-report=xml
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+      - name: Run tests with coverage
+        run: |
+          python3 -m pytest -s \
+            --cov=experiment_generator \
+            --cov-branch \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            tests
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
         with:
-          name: coverage-report-py${{ matrix.python-version }}
-          path: coverage.xml
+         token: ${{ secrets.CODECOV_TOKEN }}
+         files: ./coverage.xml
