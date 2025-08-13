@@ -25,11 +25,12 @@ def main():
             "in the current directory.\n"
             "If that file is missing, you must specify one with -i / --input-yaml-file."
         ),
-        formatter_class=argparse.RawTextHelpFormatter
+        formatter_class=argparse.RawTextHelpFormatter,
     )
 
     parser.add_argument(
-        "-i", "--input-yaml-file",
+        "-i",
+        "--input-yaml-file",
         type=str,
         help=(
             "Path to the YAML file specifying parameter values for experiment runs.\n"

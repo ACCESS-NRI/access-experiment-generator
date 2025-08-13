@@ -33,6 +33,7 @@ model_type: {VALID_MODELS[0]}
     assert called.get("run") is True
     assert called["indata"]["model_type"] == VALID_MODELS[0]
 
+
 def test_main_uses_default_yaml_when_present(tmp_path, monkeypatch):
     default_yaml = tmp_path / "Experiment_manager.yaml"
     default_yaml.write_text(
@@ -62,6 +63,7 @@ model_type: {VALID_MODELS[1]}
 
     assert called.get("run") is True
     assert called["indata"]["model_type"] == VALID_MODELS[1]
+
 
 def test_main_errors_when_no_yaml_provided_and_default_missing(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
