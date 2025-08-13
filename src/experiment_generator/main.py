@@ -1,4 +1,5 @@
 import argparse
+import os
 
 from .utils import read_yaml
 from .experiment_generator import ExperimentGenerator
@@ -12,34 +13,43 @@ def main():
     and invokes the ExperimentGenerator to produce the required setups.
 
     Command-line Arguments:
-        --input-yaml-file (str, optional):
+        -i, --input-yaml-file (str, optional):
             Path to the YAML file specifying parameter values for the experiment runs.
-            Defaults to 'Experiment_manager.yaml'.
+            Defaults to 'Experiment_manager.yaml' if it exists.
     """
 
     parser = argparse.ArgumentParser(
-        description="""
-        Manage ACCESS experiments using configurable YAML input.
-        This tool helps generate control and perturbation experiments.
-        Latest version and help: TODO
-        """
+        description=(
+            "Manage ACCESS experiments using configurable YAML input.\n"
+            "If no YAML file is specified, the tool will look for 'Experiment_manager.yaml' "
+            "in the current directory.\n"
+            "If that file is missing, you must specify one with -i / --input-yaml-file."
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
     )
 
     parser.add_argument(
+        "-i",
         "--input-yaml-file",
         type=str,
-        nargs="?",
-        default="Experiment_manager.yaml",
         help=(
             "Path to the YAML file specifying parameter values for experiment runs.\n"
-            "If not provided, defaults to 'Experiment_manager.yaml'."
+            "Defaults to 'Experiment_manager.yaml' if present in the current directory."
         ),
     )
 
     args = parser.parse_args()
+    if args.input_yaml_file:
+        input_yaml = args.input_yaml_file
+    elif os.path.exists("Experiment_manager.yaml"):
+        input_yaml = "Experiment_manager.yaml"
+    else:
+        parser.error(
+            "No YAML file specified and 'Experiment_manager.yaml' not found.\n"
+            "Please provide one using -i / --input-yaml-file."
+        )
 
     # Load the YAML file
-    input_yaml = args.input_yaml_file
     indata = read_yaml(input_yaml)
 
     # Run the experiment generator
