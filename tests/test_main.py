@@ -1,8 +1,7 @@
 import sys
 import experiment_generator.main as main_module
+from experiment_generator.experiment_generator import VALID_MODELS
 import pytest
-
-VALID_MODELS = ["access-om2", "access-om3"]
 
 
 def test_main_runs_with_i_flag(tmp_path, monkeypatch):
