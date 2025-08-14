@@ -97,7 +97,7 @@ def test_manage_control_expt_no_control_data(tmp_path):
         "repository_directory": "test_repo",
     }
     expt = pert_exp(tmp_path, indata)
-    with pytest.raises(ValueError):
+    with pytest.warns(UserWarning, match="No Control_Experiment block provided"):
         expt.manage_control_expt()
 
 

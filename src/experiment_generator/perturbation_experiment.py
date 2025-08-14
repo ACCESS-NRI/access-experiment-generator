@@ -71,8 +71,12 @@ class PerturbationExperiment(BaseExperiment):
         Update files for the control branch (name held in `self.control_branch_name`).
         """
         control_data = self.indata.get("Control_Experiment")
-        if not control_data:
-            raise ValueError("No Control_Experiment block provided in the input yaml file.")
+        if control_data is None:
+            warnings.warn(
+                "No Control_Experiment block provided in the input YAML file. " "Skipping control branch updates.",
+                UserWarning,
+            )
+            return
 
         # Ensure we are on the control branch
         branch_names = {i.name for i in self.gitrepository.repo.branches}
