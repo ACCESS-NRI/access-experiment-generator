@@ -31,6 +31,7 @@ jobs:
   pypa-build:
     name: PyPA build
     runs-on: ubuntu-latest
+    needs: formatting
     steps:
       - uses: actions/checkout@v4
 
@@ -41,10 +42,11 @@ jobs:
 
       - run: |
           python3 -m pip install --upgrade build && python3 -m build
-    
+
   conda-build:
     name: Conda Build
     runs-on: ubuntu-latest
+    needs: formatting
     steps:
       - uses: actions/checkout@v4
 
@@ -68,7 +70,7 @@ jobs:
   tests:
     name: Tests
     runs-on: ubuntu-latest
-
+    needs: formatting
     # Run the job for different versions of python
     strategy:
       matrix:
