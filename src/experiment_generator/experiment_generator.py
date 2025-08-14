@@ -3,7 +3,7 @@ from .perturbation_experiment import PerturbationExperiment
 from .base_experiment import BaseExperiment
 
 # can be extended to include other models
-VALID_MODELS = ("access-om2", "access-om3")
+VALID_MODELS = ("access-esm1.5", "access-esm1.6", "access-om2", "access-om3")
 
 
 class ExperimentGenerator(BaseExperiment):
