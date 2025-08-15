@@ -9,6 +9,7 @@ from .config_updater import ConfigUpdater
 from .nuopc_runconfig_updater import NuopcRunConfigUpdater
 from .mom6_input_updater import Mom6InputUpdater
 from .nuopc_runseq_updater import NuopcRunseqUpdater
+from .om2_forcing_updater import Om2ForcingUpdater
 
 BRANCH_SUFFIX = "_branches"
 
@@ -49,6 +50,7 @@ class PerturbationExperiment(BaseExperiment):
         self.nuopcrunconfigupdater = NuopcRunConfigUpdater(directory)
         self.mom6inputupdater = Mom6InputUpdater(directory)
         self.nuopcrunsequpdater = NuopcRunseqUpdater(directory)
+        self.om2forcingupdater = Om2ForcingUpdater(directory)
 
     def _apply_updates(self, file_params: dict[str, dict]) -> None:
         """
@@ -65,6 +67,8 @@ class PerturbationExperiment(BaseExperiment):
                 self.mom6inputupdater.update_mom6_params(params, filename)
             elif filename == "nuopc.runseq":
                 self.nuopcrunsequpdater.update_nuopc_runseq(params, filename)
+            elif filename == "atmosphere/forcing.json":
+                self.om2forcingupdater.update_forcing_params(params, filename)
 
     def manage_control_expt(self) -> None:
         """
@@ -178,6 +182,17 @@ class PerturbationExperiment(BaseExperiment):
         """
         Recursively extract parameters for a specific run index from nested structures.
         Handles dicts, lists of scalars, lists of lists, and lists of dicts.
+
+        Rules:
+         - dict: recursively extract for each key.
+         - list of dicts: extract for each dict, if all dicts are the same, return one
+         - list of lists:
+            - if outer len == 1 -> unwrap that inner list (treat as fixed vector)
+            - else -> for each inner list: len == 1 -> broadcast; else pick by index (len must equal total_exps)
+         - plain list (scalar, string, etc):
+            - if len == 1 or all equal -> broadcast that single value
+            - else -> pick by index (len must equal total_exps)
+         - other scalar / strings: return as is.
         """
         result = {}
         for key, value in nested_dict.items():
@@ -187,7 +202,7 @@ class PerturbationExperiment(BaseExperiment):
             # list or list of lists
             elif isinstance(value, list):
                 # if it's a list of dicts (e.g., for submodels in `config.yaml` in OM2)
-                if len(value) > 0 and all(isinstance(i, dict) for i in value):
+                if value and all(isinstance(i, dict) for i in value):
                     # process each dict in the list for the given column indx
                     tmp = [self._extract_run_specific_params(i, indx, total_exps) for i in value]
                     if all(i == tmp[0] for i in tmp):
@@ -195,20 +210,24 @@ class PerturbationExperiment(BaseExperiment):
                     else:
                         result[key] = tmp
                 # if it's a list of lists
-                elif len(value) > 0 and all(isinstance(i, list) for i in value):
-                    new_list = []
-                    for row in value:
-                        if len(row) == 1:
-                            # Broadcast the single element for any index
-                            new_list.append(row[0])
-                        else:
-                            if len(row) != total_exps:
-                                raise ValueError(
-                                    f"For key '{key}', the inner list length {len(row)}, but the "
-                                    f"total experiment {total_exps}"
-                                )
-                            new_list.append(row[indx])
-                    result[key] = new_list
+                elif value and all(isinstance(i, list) for i in value):
+                    if len(value) == 1:
+                        # e.g., dimension: [["temporal","spatial"]] -> ["temporal","spatial"]
+                        result[key] = value[0]
+                    else:
+                        new_list = []
+                        for row in value:
+                            if len(row) == 1:
+                                # Broadcast the single element for any index
+                                new_list.append(row[0])
+                            else:
+                                if len(row) != total_exps:
+                                    raise ValueError(
+                                        f"For key '{key}', the inner list length {len(row)}, but the "
+                                        f"total experiment {total_exps}"
+                                    )
+                                new_list.append(row[indx])
+                        result[key] = new_list
                 else:
                     # Plain list: if it has one element or all elements are identical, broadcast that element.
                     if len(value) == 1 or (len(value) > 1 and all(i == value[0] for i in value)):
