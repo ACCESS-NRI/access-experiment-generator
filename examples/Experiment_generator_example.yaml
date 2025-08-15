@@ -2,8 +2,7 @@
 # This file sets up parameters for both the control and perturbation experiments.
 # Adjust the settings below as needed for your environment and model.
 
-
-model_type: access-om2  # Specify the model ("access-om2" or "access-om3")
+model_type: access-om2 # Specify the model ("access-om2" or "access-om3")
 repository_url: git@github.com:ACCESS-NRI/access-om2-configs.git
 start_point: "fce24e3" # Control commit hash for new branches
 test_path: prototype-0.1.0 # Relative path for the central repository (control and perturbation) (user-defined)
@@ -12,35 +11,47 @@ repository_directory: 1deg_jra55_ryf # Local directory name for the central repo
 control_branch_name: ctrl
 
 Control_Experiment:
-  accessom2.nml:
-      date_manager_nml:
-          restart_period: '0,0,86400'
+    accessom2.nml:
+        date_manager_nml:
+            restart_period: "0,0,86400"
 
-  config.yaml:
-    queue: express
-    walltime: 5:00:00
+    config.yaml:
+        queue: express
+        walltime: 5:00:00
 
-  ice/cice_in.nml:
-      shortwave_nml:
-          albicei: 0.05
-          albicev: 0.08
-      thermo_nml:
-          chio: 0.001
+    ice/cice_in.nml:
+        shortwave_nml:
+            albicei: 0.05
+            albicev: 0.08
+        thermo_nml:
+            chio: 0.001
 
 Perturbation_Experiment:
     Parameter_block1:
-        Parameter_block1_branches:  [perturb_1, perturb_2]
+        branches:
+            - perturb_1
+            - perturb_2
+
         ice/cice_in.nml:
             shortwave_nml:
-                albicei:            [0.36     , 0.39]
-                albicev:            [0.78     , 0.81]
-
+                albicei:
+                    - 0.06
+                    - 0.07
+                albicev:
+                    - 0.78
+                    - 0.81
             thermo_nml:
-                chio:               [0.007    , 0.008]
+                chio:
+                    - 0.007
+                    - 0.008
 
         ocean/input.nml:
             ocean_nphysics_util_nml:
-                agm_closure_length: [2.5e4    , 7.5e4]
+                agm_closure_length:
+                    - 25000.0
+                    - 75000.0
 
-    # Parameter_block2:
-    #     Parameter_block2_branches: [test-nml1, test-nml2]
+    Parameter_block2:
+        # branches:
+        #     - test-nml1
+        #     - test-nml2
