@@ -51,5 +51,7 @@ Perturbation_Experiment:
                     - 25000.0
                     - 75000.0
 
-    # Parameter_block2:
-    #     branches: [test-nml1, test-nml2]
+    Parameter_block2:
+        # branches:
+        #     - test-nml1
+        #     - test-nml2
