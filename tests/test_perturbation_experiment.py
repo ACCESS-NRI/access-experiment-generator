@@ -4,6 +4,9 @@ from pathlib import Path
 from conftest import DummyBranch
 from experiment_generator.perturbation_experiment import PerturbationExperiment as pert_exp
 from experiment_generator.perturbation_experiment import ExperimentDefinition as ed
+from experiment_generator.perturbation_experiment import BRANCH_KEY
+
+PARAMETER_BLOCK = "Parameter_block1"
 
 
 def test_apply_updates_call_correct_updater(tmp_path, monkeypatch):
@@ -208,8 +211,8 @@ def test_manage_perturb_expt_applies_all_steps(tmp_path, monkeypatch):
     expt = pert_exp(repo_dir, indata)
 
     definitions = [
-        ed(block_name="Parameter_block1", branch_name="perturb_1", file_params={"file1": {"p": 1}}),
-        ed(block_name="Parameter_block1", branch_name="perturb_2", file_params={"file2": {"q": 2}}),
+        ed(block_name=PARAMETER_BLOCK, branch_name="perturb_1", file_params={"file1": {"p": 1}}),
+        ed(block_name=PARAMETER_BLOCK, branch_name="perturb_2", file_params={"file2": {"q": 2}}),
     ]
 
     monkeypatch.setattr(pert_exp, "_collect_experiment_definitions", lambda self, namelists: definitions, raising=True)
@@ -249,10 +252,10 @@ def test_setup_branch_existing_and_new(tmp_path, monkeypatch):
     }
     expt = pert_exp(repo_dir, indata)
 
-    expt_def = ed(block_name="Parameter_block1", branch_name="perturb_1", file_params={})
+    expt_def = ed(block_name=PARAMETER_BLOCK, branch_name="perturb_1", file_params={})
 
     # if branch already exists
-    expt.gitrepository.repo.branches = [type("Parameter_block1", (), {"name": "perturb_1"})()]
+    expt.gitrepository.repo.branches = [type(PARAMETER_BLOCK, (), {"name": "perturb_1"})()]
     called = {}
 
     def dummy_checkout_branch(**kwargs):
@@ -283,8 +286,8 @@ def test_collect_experiment_definitions_multiple_eds(tmp_path):
 
     # Perturbation input with 2 branches and param lists
     namelists = {
-        "Parameter_block1": {
-            "Parameter_block1_branches": ["perturb_1", "perturb_2"],
+        PARAMETER_BLOCK: {
+            f"{BRANCH_KEY}": ["perturb_1", "perturb_2"],
             "config.yaml": {"queue": ["normal", "normalsr"], "jobfs": [10, 20]},
         }
     }
@@ -302,7 +305,7 @@ def test_collect_experiment_definitions_multiple_eds(tmp_path):
     assert defn2.file_params == expected_file_params2
 
 
-def test_collect_experiment_definitions_missing_branches_suffix(tmp_path):
+def test_collect_experiment_definitions_missing_branches_key(tmp_path):
     repo_dir = tmp_path / "test_repo"
     indata = {
         "repository_directory": repo_dir.name,
@@ -310,7 +313,7 @@ def test_collect_experiment_definitions_missing_branches_suffix(tmp_path):
     }
     expt = pert_exp(repo_dir, indata)
 
-    namelists = {"Parameter_block1": {"Parameter_block1_aaa": "perturb_1"}}
+    namelists = {PARAMETER_BLOCK: {}}
     with pytest.warns(UserWarning):
         result = expt._collect_experiment_definitions(namelists)
     assert result == []

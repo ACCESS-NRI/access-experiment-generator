@@ -10,7 +10,7 @@ from .nuopc_runconfig_updater import NuopcRunConfigUpdater
 from .mom6_input_updater import Mom6InputUpdater
 from .nuopc_runseq_updater import NuopcRunseqUpdater
 
-BRANCH_SUFFIX = "_branches"
+BRANCH_KEY = "branches"
 
 
 @dataclass
@@ -145,7 +145,7 @@ class PerturbationExperiment(BaseExperiment):
         """
         experiment_definitions = []
         for block_name, blockcontents in namelists.items():
-            branch_keys = f"{block_name}{BRANCH_SUFFIX}"
+            branch_keys = f"{BRANCH_KEY}"
             if branch_keys not in blockcontents:
                 warnings.warn(
                     f"\nNO {branch_keys} were provided, hence skipping parameter-sensitivity tests!",
