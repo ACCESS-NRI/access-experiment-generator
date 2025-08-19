@@ -15,7 +15,7 @@ def main():
     Command-line Arguments:
         -i, --input-yaml-file (str, optional):
             Path to the YAML file specifying parameter values for the experiment runs.
-            Defaults to 'Experiment_manager.yaml' if it exists.
+            Defaults to 'Experiment_generator.yaml' if it exists.
     """
 
     parser = argparse.ArgumentParser(

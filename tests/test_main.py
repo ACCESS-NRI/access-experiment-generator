@@ -77,5 +77,5 @@ def test_main_errors_when_no_yaml_provided_and_default_missing(tmp_path, monkeyp
     captured = capsys.readouterr()
 
     err = captured.err
-    assert "Experiment_manager.yaml" in err
+    assert "Experiment_generator.yaml" in err
     assert "-i / --input-yaml-file" in err
