@@ -34,7 +34,7 @@ model_type: {VALID_MODELS[0]}
 
 
 def test_main_uses_default_yaml_when_present(tmp_path, monkeypatch):
-    default_yaml = tmp_path / "Experiment_manager.yaml"
+    default_yaml = tmp_path / "Experiment_generator.yaml"
     default_yaml.write_text(
         f"""
 repository_directory: test_repo
@@ -77,5 +77,5 @@ def test_main_errors_when_no_yaml_provided_and_default_missing(tmp_path, monkeyp
     captured = capsys.readouterr()
 
     err = captured.err
-    assert "Experiment_manager.yaml" in err
+    assert "Experiment_generator.yaml" in err
     assert "-i / --input-yaml-file" in err

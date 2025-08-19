@@ -11,16 +11,15 @@ class BaseExperiment:
 
     def __init__(self, indata: dict) -> None:
         self.indata = indata
-        self.dir_manager = Path.cwd()
 
         # General experiment setup
-        self.test_path = Path(indata.get("test_path", "experiment_generator_test_path"))
+        self.test_path = Path(indata.get("test_path", ".")).expanduser()
         self.model_type = indata.get("model_type", False)
 
         # Repository setup
         self.repository = indata.get("repository_url")
         self.repo_dir = indata.get("repository_directory")
-        self.directory = Path(self.dir_manager) / self.test_path / self.repo_dir
+        self.directory = (self.test_path / self.repo_dir).resolve()
         self.existing_branch = indata.get("existing_branch", None)
         self.control_branch_name = indata.get("control_branch_name", False)
         self.keep_uuid = indata.get("keep_uuid", False)

@@ -2,25 +2,28 @@ from pathlib import Path
 from experiment_generator.base_experiment import BaseExperiment
 
 
-def test_base_experiment_defaults_and_paths():
+def test_base_experiment_defaults_and_paths(tmp_path, monkeypatch):
     """
     this should set default values for missing optional input keys.
     """
 
-    # mininal input
+    # isolate the real cwd
+    monkeypatch.chdir(tmp_path)
+
+    # minimal input
     indata = {
         "repository_directory": "test_repo",
     }
 
     base = BaseExperiment(indata)
 
-    assert base.test_path == Path("experiment_generator_test_path")
+    assert base.test_path == Path(".")
     assert base.model_type is False
 
     # Repository setup
     assert base.repository is None
     assert base.repo_dir == "test_repo"
-    assert base.directory == Path.cwd() / "experiment_generator_test_path" / "test_repo"
+    assert base.directory == (tmp_path / "test_repo").resolve()
     assert base.existing_branch is None
     assert base.control_branch_name is False
     assert base.keep_uuid is False
@@ -59,6 +62,7 @@ def test_base_experiment_custom_values_and_paths(tmp_path):
 
     assert base.test_path == tmp_path / "custom_test_path"
     assert base.repo_dir == "test_repo2"
+    assert base.directory == (tmp_path / "custom_test_path" / "test_repo2").resolve()
     assert base.model_type == "access-om3"
     assert base.repository == "https://github.com/ACCESS-NRI/access-om3-configs.git"
     assert base.existing_branch == "main"
@@ -70,3 +74,21 @@ def test_base_experiment_custom_values_and_paths(tmp_path):
     assert base.lab_path == tmp_path / "lab_path"
     assert base.start_point == "abcd1234"
     assert base.perturbation_enabled is True
+
+
+def test_base_experiment_test_path_home_expansion(tmp_path, monkeypatch):
+
+    dummy_home = tmp_path / "home"
+    (dummy_home / "experiments").mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("HOME", str(dummy_home))
+
+    # minimal input with home directory expansion
+    indata = {
+        "test_path": "~/experiments",
+        "repository_directory": "test_repo3",
+    }
+
+    base = BaseExperiment(indata)
+
+    assert base.test_path == dummy_home / "experiments"
+    assert base.directory == (dummy_home / "experiments" / "test_repo3").resolve()
