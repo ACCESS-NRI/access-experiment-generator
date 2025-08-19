@@ -5,30 +5,35 @@
 # 2. using [~]
 # 3. using [null]
 
-model_type: access-om3 # Specify the model ("access-om2" or "access-om3")
+model_type: access-om3 # Specify the model ("access-om2", "access-om3", "access-esm1.5", or "access-esm1.6")
 repository_url: git@github.com:ACCESS-NRI/access-om3-configs.git
 start_point: "52bf0b6" # Control commit hash for new branches
-test_path: prototype-0.2.0-remove-parameters # Relative path for the central repository (control and perturbation) (user-defined)
+test_path: prototype-0.2.0-remove-parameters # All control and perturbation experiment repositories will be created here; can be relative, absolute or ~ (user-defined)
 repository_directory: MC_25km_jra_ryf # Local directory name for the central repository (user-defined)
 
 control_branch_name: ctrl
 
 Control_Experiment:
-    nuopc.runseq:
-        cpl_dt: 1100
 
 Perturbation_Experiment:
     Parameter_block1:
-        Parameter_block1_branches: [perturb_1]
+        branches:
+            - perturb_1
         MOM_input:
-            AUTO_IO_LAYOUT_FAC: [REMOVE]
-            INIT_LAYERS_FROM_Z_FILE: [~]
-            Z_INIT_ALE_REMAPPING: [null]
+            AUTO_IO_LAYOUT_FAC:
+                - REMOVE
+            INIT_LAYERS_FROM_Z_FILE:
+                - ~
+            Z_INIT_ALE_REMAPPING:
+                - null
         ice_in:
             thermo_nml:
-                dsdt_slow_mode: [REMOVE]
+                dsdt_slow_mode:
+                    - REMOVE
             shortwave_nml:
-                ahmax: [~]
+                ahmax:
+                    - ~
         nuopc.runconfig:
             DRIVER_attributes:
-                pio_blocksize: [null]
+                pio_blocksize:
+                    - null
