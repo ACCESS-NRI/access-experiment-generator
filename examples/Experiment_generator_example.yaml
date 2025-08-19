@@ -5,7 +5,7 @@
 model_type: access-om2 # Specify the model ("access-om2", "access-om3", "access-esm1.5", or "access-esm1.6")
 repository_url: git@github.com:ACCESS-NRI/access-om2-configs.git
 start_point: "fce24e3" # Control commit hash for new branches
-test_path: prototype-0.1.0 # All control and perturbation experiment repositories will be created here; can be relative or absolute (user-defined)
+test_path: prototype-0.1.0 # All control and perturbation experiment repositories will be created here; can be relative, absolute or ~ (user-defined)
 repository_directory: 1deg_jra55_ryf # Local directory name for the central repository (user-defined)
 
 control_branch_name: ctrl
