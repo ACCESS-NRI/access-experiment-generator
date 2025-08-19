@@ -21,7 +21,7 @@ def main():
     parser = argparse.ArgumentParser(
         description=(
             "Manage ACCESS experiments using configurable YAML input.\n"
-            "If no YAML file is specified, the tool will look for 'Experiment_manager.yaml' "
+            "If no YAML file is specified, the tool will look for 'Experiment_generator.yaml' "
             "in the current directory.\n"
             "If that file is missing, you must specify one with -i / --input-yaml-file."
         ),
@@ -34,18 +34,18 @@ def main():
         type=str,
         help=(
             "Path to the YAML file specifying parameter values for experiment runs.\n"
-            "Defaults to 'Experiment_manager.yaml' if present in the current directory."
+            "Defaults to 'Experiment_generator.yaml' if present in the current directory."
         ),
     )
 
     args = parser.parse_args()
     if args.input_yaml_file:
         input_yaml = args.input_yaml_file
-    elif os.path.exists("Experiment_manager.yaml"):
-        input_yaml = "Experiment_manager.yaml"
+    elif os.path.exists("Experiment_generator.yaml"):
+        input_yaml = "Experiment_generator.yaml"
     else:
         parser.error(
-            "No YAML file specified and 'Experiment_manager.yaml' not found.\n"
+            "No YAML file specified and 'Experiment_generator.yaml' not found.\n"
             "Please provide one using -i / --input-yaml-file."
         )
 
