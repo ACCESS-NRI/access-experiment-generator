@@ -1,6 +1,7 @@
 from pathlib import Path
 from .tmp_parser.json_parser import read_json, write_json
 from .utils import update_config_entries
+import warnings
 
 
 class Om2ForcingUpdater:
@@ -20,9 +21,6 @@ class Om2ForcingUpdater:
         file_read = read_json(forcing_path)
 
         for fieldname, updates in param_dict.items():
-            if not isinstance(updates, dict):
-                raise ValueError(f"The yaml input {fieldname} must be a dict!")
-
             for required_key in ("filename", "cname"):
                 if required_key not in updates or not updates[required_key]:
                     raise ValueError(f"The yaml input {fieldname} must have a non-empty '{required_key}' key!")
@@ -34,19 +32,7 @@ class Om2ForcingUpdater:
             base = file_read["inputs"][idx]
 
             if "perturbations" in updates:
-                perts = updates["perturbations"]
-                if isinstance(perts, dict):
-                    perts = [perts]
-                    updates["perturbations"] = perts
-                elif isinstance(perts, list):
-                    pass
-                else:
-                    raise TypeError(
-                        f"The yaml input {fieldname} must have 'perturbations' as a list of dicts or a dict"
-                    )
-
-                for pert in perts:
-                    self._validate_perturbation(pert)
+                self._preprocess_perturbations(fieldname, updates)
 
             update_config_entries(base, updates)
 
@@ -63,10 +49,45 @@ class Om2ForcingUpdater:
             return i
         return None
 
+    def _preprocess_perturbations(self, fieldname: str, updates: dict) -> None:
+        """
+        process `updates["perturbations"]`.
+        Warns and removes the key from `updates` if unsuitable.
+        """
+        perts = updates.get("perturbations")
+
+        # treat falsy as "no change"
+        if perts in (None, {}, []):
+            warnings.warn(
+                f"-- forcing.json '{fieldname}': empty/None 'perturbations' provided; skipping.",
+                UserWarning,
+            )
+            updates.pop("perturbations", None)
+            return
+
+        # accept dict -> wrap it to list[dict]
+        if isinstance(perts, dict):
+            perts = [perts]
+            updates["perturbations"] = perts
+
+        # accept list[dict]
+        elif isinstance(perts, list) and all(isinstance(pert, dict) for pert in perts):
+            pass
+        else:
+            raise TypeError(f"-- forcing.json '{fieldname}': 'perturbations' must be a dict or list of dicts")
+
+        # validate each dict
+        for pert in perts:
+            self._validate_single_perturbation(pert)
+
     @staticmethod
-    def _validate_perturbation(pert: dict) -> None:
+    def _validate_single_perturbation(pert: dict) -> None:
+        """
+        Validate a single perturbation dict.
+        Required keys: type, dimension, value, calendar, comment.
+        """
         required = ["type", "dimension", "value", "calendar", "comment"]
-        missing = [m for m in required if m not in pert]
+        missing = [p for p in required if p not in pert]
         if missing:
             raise ValueError(f"Perturbation is missing required fields: {', '.join(missing)}")
 
@@ -75,7 +96,7 @@ class Om2ForcingUpdater:
 
         dim = pert["dimension"]
         accepted_dim = (isinstance(dim, str) and dim in {"spatial", "temporal", "constant", "spatiotemporal"}) or (
-            isinstance(dim, list) and (dim == ["spatial", "temporal"] or dim == ["temporal", "spatial"])
+            isinstance(dim, list) and (dim == ["temporal", "spatial"] or dim == ["spatial", "temporal"])
         )
         if not accepted_dim:
             raise ValueError(f"Invalid perturbation dimension: {dim}")
