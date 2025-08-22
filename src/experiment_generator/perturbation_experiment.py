@@ -177,18 +177,42 @@ class PerturbationExperiment(BaseExperiment):
     def _extract_run_specific_params(self, nested_dict: dict, indx: int, total_exps: int) -> dict:
         """
         Recursively extract parameters for a specific run index from nested structures.
-        Handles dicts, lists of scalars, lists of lists, and lists of dicts.
+        It handles (nested) dicts, plain lists, lists of lists, and lists of dicts,
+        also handles broadcasting, filtering, and index-based selection.
+
 
         Rules:
-         - dict: recursively extract for each key.
-         - list of dicts: extract for each dict, if all dicts are the same, return one
+         - (nested) dict: recursively extract for each key.
+         - list of dicts: extract for each dict, if all dicts are the same, return a single dict;
          - list of lists:
-            - for each inner list: len == 1 -> broadcast;
-            - else pick by index (len must equal total_exps)
-         - plain list (scalar, string, etc):
-            - if len == 1 or all equal -> broadcast that single value
+            - if outer length == 1: treats as a broadcast, unwraps the inner list and applies it to all branches.
+            - if outer length == total_exps: extracts by index.
+         - plain list (scalars, strings):
+            - if outer length == 1: broadcasts the single value to all branches.
+            - if outer length == total_exps: extracts by index.
             - else -> pick by index (len must equal total_exps)
-         - other scalar / strings: return as is.
+         - other scalar / strings: broadcasts the single value to all branches.
+
+        Broadcasting:
+         - Broadcasting allows a single item to apply to all branches, avoiding duplication.
+            - Example:
+            ```yaml
+            modules:
+                load:
+                - [access-om3]
+            ```
+            The above interpreted as `load: [access-om3]` for all branches
+
+        -  Filtering:
+         - Filtering cleans lists by removing `None`, `'REMOVE'`, or `~`.
+            - Example:
+            ```yaml
+            modules:
+                load:
+                - [access-om3]
+                - [~]
+            ```
+            For the 2nd branch, `load` is filtered to empty, so the `load` key is removed.
         """
         REMOVED = {None, "REMOVE"}
 
@@ -220,6 +244,7 @@ class PerturbationExperiment(BaseExperiment):
                         result[key] = tmp[0]
                     else:
                         result[key] = tmp
+
                 # if it's a list of lists
                 elif value and all(isinstance(i, list) for i in value):
                     outer_len = len(value)
