@@ -196,6 +196,15 @@ class PerturbationExperiment(BaseExperiment):
             """Filter out None or 'REMOVE' values from a list."""
             return [x for x in lst if x not in REMOVED]
 
+        def _list_select_and_clean(row: list | str | None) -> list | str | None:
+            if isinstance(row, list):
+                cleaned = _filter_list(row)
+                return cleaned if cleaned else None
+            elif row in REMOVED:
+                return None
+            else:
+                return row
+
         result = {}
         for key, value in nested_dict.items():
             # nested dictionary
@@ -214,27 +223,14 @@ class PerturbationExperiment(BaseExperiment):
                 # if it's a list of lists
                 elif value and all(isinstance(i, list) for i in value):
                     outer_len = len(value)
-
                     if outer_len == 1:
-                        # [["spatial","temporal"]] -> ["spatial","temporal"]
-                        tmp = value[0]
-                        if isinstance(tmp, list):
-                            cleaned = _filter_list(tmp)
-                            result[key] = cleaned if cleaned else None
-                        else:
-                            # if tmp is a scalar, just set it
-                            result[key] = None if tmp in REMOVED else tmp
-
+                        result[key] = _list_select_and_clean(value[0])
                     elif outer_len == total_exps:
-                        # row-wise selection
-                        row = value[indx]
-
-                        if isinstance(row, list):
-                            cleaned = _filter_list(row)
-                            result[key] = cleaned if cleaned else None
-                        else:
-                            # if row is a scalar, just set it
-                            result[key] = None if row in REMOVED else row
+                        result[key] = _list_select_and_clean(value[indx])
+                    else:
+                        raise ValueError(
+                            f"For key '{key}', expected outer list-of-lists length 1 or {total_exps}, got {outer_len}"
+                        )
                 else:
                     # Plain list: if it has one element or all elements are identical, broadcast that element.
                     if len(value) == 1 or (len(value) > 1 and all(i == value[0] for i in value)):
