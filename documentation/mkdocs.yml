@@ -108,6 +108,8 @@ markdown_extensions:
 # Navigation
 nav:
   - Home:                  index.md
+  - Perturbation Cookbook: Perturbation-cookbook.md
+  - Repository Structure:  Repository-Structure.md
 
 # Footer
 extra:
