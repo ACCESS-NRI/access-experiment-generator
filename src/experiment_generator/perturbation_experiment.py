@@ -178,7 +178,24 @@ class PerturbationExperiment(BaseExperiment):
         """
         Recursively extract parameters for a specific run index from nested structures.
         Handles dicts, lists of scalars, lists of lists, and lists of dicts.
+
+        Rules:
+         - dict: recursively extract for each key.
+         - list of dicts: extract for each dict, if all dicts are the same, return one
+         - list of lists:
+            - for each inner list: len == 1 -> broadcast;
+            - else pick by index (len must equal total_exps)
+         - plain list (scalar, string, etc):
+            - if len == 1 or all equal -> broadcast that single value
+            - else -> pick by index (len must equal total_exps)
+         - other scalar / strings: return as is.
         """
+        REMOVED = {None, "REMOVE"}
+
+        def _filter_list(lst: list) -> list:
+            """Filter out None or 'REMOVE' values from a list."""
+            return [x for x in lst if x not in REMOVED]
+
         result = {}
         for key, value in nested_dict.items():
             # nested dictionary
@@ -187,7 +204,7 @@ class PerturbationExperiment(BaseExperiment):
             # list or list of lists
             elif isinstance(value, list):
                 # if it's a list of dicts (e.g., for submodels in `config.yaml` in OM2)
-                if len(value) > 0 and all(isinstance(i, dict) for i in value):
+                if value and all(isinstance(i, dict) for i in value):
                     # process each dict in the list for the given column indx
                     tmp = [self._extract_run_specific_params(i, indx, total_exps) for i in value]
                     if all(i == tmp[0] for i in tmp):
@@ -195,20 +212,29 @@ class PerturbationExperiment(BaseExperiment):
                     else:
                         result[key] = tmp
                 # if it's a list of lists
-                elif len(value) > 0 and all(isinstance(i, list) for i in value):
-                    new_list = []
-                    for row in value:
-                        if len(row) == 1:
-                            # Broadcast the single element for any index
-                            new_list.append(row[0])
+                elif value and all(isinstance(i, list) for i in value):
+                    outer_len = len(value)
+
+                    if outer_len == 1:
+                        # [["spatial","temporal"]] -> ["spatial","temporal"]
+                        tmp = value[0]
+                        if isinstance(tmp, list):
+                            cleaned = _filter_list(tmp)
+                            result[key] = cleaned if cleaned else None
                         else:
-                            if len(row) != total_exps:
-                                raise ValueError(
-                                    f"For key '{key}', the inner list length {len(row)}, but the "
-                                    f"total experiment {total_exps}"
-                                )
-                            new_list.append(row[indx])
-                    result[key] = new_list
+                            # if tmp is a scalar, just set it
+                            result[key] = None if tmp in REMOVED else tmp
+
+                    elif outer_len == total_exps:
+                        # row-wise selection
+                        row = value[indx]
+
+                        if isinstance(row, list):
+                            cleaned = _filter_list(row)
+                            result[key] = cleaned if cleaned else None
+                        else:
+                            # if row is a scalar, just set it
+                            result[key] = None if row in REMOVED else row
                 else:
                     # Plain list: if it has one element or all elements are identical, broadcast that element.
                     if len(value) == 1 or (len(value) > 1 and all(i == value[0] for i in value)):
