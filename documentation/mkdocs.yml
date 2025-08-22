@@ -54,17 +54,17 @@ theme:
 copyright: Copyright &copy; 2025 ACCESS-NRI
 
 plugins:
-  - include-configuration-stubs:
-      repo: ACCESS-NRI/access-experiment-generator
-      main_website:
-        pattern: "dev-* release-*"
-        ref_type: branch
-      preview_website:
-        pattern: ""
-        ref_type: branch
-      stubs_parent_url: pages/configurations
-      stubs_nav_path: Configurations
-      stubs_dir: documentation/stub
+#- include-configuration-stubs:
+#    repo: ACCESS-NRI/access-experiment-generator
+#    main_website:
+#      pattern: "dev-* release-*"
+#      ref_type: branch
+#    preview_website:
+#      pattern: ""
+#      ref_type: branch
+#    stubs_parent_url: pages/configurations
+#    stubs_nav_path: Configurations
+#    stubs_dir: documentation/stub
 
   - git-revision-date-localized:
       type: date
