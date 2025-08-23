@@ -260,13 +260,14 @@ class PerturbationExperiment(BaseExperiment):
                     # Plain list: if it has one element or all elements are identical, broadcast that element.
                     if len(value) == 1 or (len(value) > 1 and all(i == value[0] for i in value)):
                         result[key] = value[0]
-                    else:
-                        if len(value) != total_exps:
-                            raise ValueError(
-                                f"For key '{key}', the inner list length {len(value)}, but the "
-                                f"total experiment {total_exps}"
-                            )
-                        result[key] = value[indx]
+                        return result
+
+                    if len(value) != total_exps:
+                        raise ValueError(
+                            f"For key '{key}', the inner list length {len(value)}, but the "
+                            f"total experiment {total_exps}"
+                        )
+                    result[key] = _list_select_and_clean(value[indx])
             # Scalar, string, etc so return as is
             else:
                 result[key] = value
