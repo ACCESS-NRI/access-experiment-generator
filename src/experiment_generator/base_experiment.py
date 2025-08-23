@@ -17,7 +17,7 @@ class BaseExperiment:
         self.model_type = indata.get("model_type", False)
 
         # Repository setup
-        self.repository = indata.get("repository_url")
+        self.repository_url = indata.get("repository_url")
         self.repo_dir = indata.get("repository_directory")
         self.directory = (self.test_path / self.repo_dir).resolve()
         self.existing_branch = indata.get("existing_branch", None)
