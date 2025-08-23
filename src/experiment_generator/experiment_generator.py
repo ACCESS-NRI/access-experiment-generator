@@ -60,10 +60,10 @@ class ExperimentGenerator(BaseExperiment):
         Clones the experiment repository if it doesn't already exist.
         """
         if self.directory.exists():
-            print(f"-- Test dir: {self.directory} already exists, hence not cloning {self.repository}")
+            print(f"-- Test dir: {self.directory} already exists, hence not cloning {self.repository_url}")
         else:
             clone(
-                repository=self.repository,
+                repository=self.repository_url,
                 directory=self.directory,
                 branch=self.existing_branch,
                 keep_uuid=self.keep_uuid,

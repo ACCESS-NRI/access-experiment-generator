@@ -1,7 +1,10 @@
 import sys
 import experiment_generator.main as main_module
+import experiment_generator.experiment_generator as exp_gen
 from experiment_generator.experiment_generator import VALID_MODELS
+from experiment_generator import utils
 import pytest
+import runpy
 
 
 def test_main_runs_with_i_flag(tmp_path, monkeypatch):
@@ -79,3 +82,32 @@ def test_main_errors_when_no_yaml_provided_and_default_missing(tmp_path, monkeyp
     err = captured.err
     assert "Experiment_generator.yaml" in err
     assert "-i / --input-yaml-file" in err
+
+
+def test_exec_main(tmp_path, monkeypatch):
+    called = {}
+
+    def dummy_read_yaml(file_path):
+        return {
+            "repository_directory": "test_repo",
+            "control_branch_name": "ctrl",
+            "model_type": VALID_MODELS[0],
+            "test_path": str(tmp_path),
+        }
+
+    class DummyEG:
+        def __init__(self, indata):
+            called["indata"] = indata
+
+        def run(self):
+            called["run"] = True
+
+    monkeypatch.setattr(utils, "read_yaml", dummy_read_yaml, raising=True)
+    monkeypatch.setattr(exp_gen, "ExperimentGenerator", DummyEG, raising=True)
+
+    monkeypatch.setattr(sys, "argv", ["prog", "-i", "dummy.yaml"])
+
+    runpy.run_module("experiment_generator.main", run_name="__main__", alter_sys=True)
+
+    assert called.get("run") is True
+    assert called["indata"]["model_type"] == VALID_MODELS[0]

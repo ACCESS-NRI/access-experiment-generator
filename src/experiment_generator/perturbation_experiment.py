@@ -177,8 +177,58 @@ class PerturbationExperiment(BaseExperiment):
     def _extract_run_specific_params(self, nested_dict: dict, indx: int, total_exps: int) -> dict:
         """
         Recursively extract parameters for a specific run index from nested structures.
-        Handles dicts, lists of scalars, lists of lists, and lists of dicts.
+        It handles (nested) dicts, plain lists, lists of lists, and lists of dicts,
+        also handles broadcasting, filtering, and index-based selection.
+
+
+        Rules:
+         - (nested) dict: recursively extract for each key.
+         - list of dicts: extract for each dict, if all dicts are the same, return a single dict;
+         - list of lists:
+            - if outer length == 1: treats as a broadcast, unwraps the inner list and applies it to all branches.
+            - if outer length == total_exps: extracts by index.
+         - plain list (scalars, strings):
+            - if outer length == 1: broadcasts the single value to all branches.
+            - if outer length == total_exps: extracts by index.
+            - else -> pick by index (len must equal total_exps)
+         - other scalar / strings: broadcasts the single value to all branches.
+
+        Broadcasting:
+         - Broadcasting allows a single item to apply to all branches, avoiding duplication.
+            - Example:
+            ```yaml
+            modules:
+                load:
+                - [access-om3]
+            ```
+            The above interpreted as `load: [access-om3]` for all branches
+
+        -  Filtering:
+         - Filtering cleans lists by removing `None`, `'REMOVE'`, or `~`.
+            - Example:
+            ```yaml
+            modules:
+                load:
+                - [access-om3]
+                - [~]
+            ```
+            For the 2nd branch, `load` is filtered to empty, so the `load` key is removed.
         """
+        REMOVED = {None, "REMOVE"}
+
+        def _filter_list(lst: list) -> list:
+            """Filter out None or 'REMOVE' values from a list."""
+            return [x for x in lst if x not in REMOVED]
+
+        def _list_select_and_clean(row: list | str | None) -> list | str | None:
+            if isinstance(row, list):
+                cleaned = _filter_list(row)
+                return cleaned if cleaned else None
+            elif row in REMOVED:
+                return None
+            else:
+                return row
+
         result = {}
         for key, value in nested_dict.items():
             # nested dictionary
@@ -187,39 +237,37 @@ class PerturbationExperiment(BaseExperiment):
             # list or list of lists
             elif isinstance(value, list):
                 # if it's a list of dicts (e.g., for submodels in `config.yaml` in OM2)
-                if len(value) > 0 and all(isinstance(i, dict) for i in value):
+                if value and all(isinstance(i, dict) for i in value):
                     # process each dict in the list for the given column indx
                     tmp = [self._extract_run_specific_params(i, indx, total_exps) for i in value]
                     if all(i == tmp[0] for i in tmp):
                         result[key] = tmp[0]
                     else:
                         result[key] = tmp
+
                 # if it's a list of lists
-                elif len(value) > 0 and all(isinstance(i, list) for i in value):
-                    new_list = []
-                    for row in value:
-                        if len(row) == 1:
-                            # Broadcast the single element for any index
-                            new_list.append(row[0])
-                        else:
-                            if len(row) != total_exps:
-                                raise ValueError(
-                                    f"For key '{key}', the inner list length {len(row)}, but the "
-                                    f"total experiment {total_exps}"
-                                )
-                            new_list.append(row[indx])
-                    result[key] = new_list
+                elif value and all(isinstance(i, list) for i in value):
+                    outer_len = len(value)
+                    if outer_len == 1:
+                        result[key] = _list_select_and_clean(value[0])
+                    elif outer_len == total_exps:
+                        result[key] = _list_select_and_clean(value[indx])
+                    else:
+                        raise ValueError(
+                            f"For key '{key}', expected outer list-of-lists length 1 or {total_exps}, got {outer_len}"
+                        )
                 else:
                     # Plain list: if it has one element or all elements are identical, broadcast that element.
                     if len(value) == 1 or (len(value) > 1 and all(i == value[0] for i in value)):
                         result[key] = value[0]
-                    else:
-                        if len(value) != total_exps:
-                            raise ValueError(
-                                f"For key '{key}', the inner list length {len(value)}, but the "
-                                f"total experiment {total_exps}"
-                            )
-                        result[key] = value[indx]
+                        return result
+
+                    if len(value) != total_exps:
+                        raise ValueError(
+                            f"For key '{key}', the inner list length {len(value)}, but the "
+                            f"total experiment {total_exps}"
+                        )
+                    result[key] = _list_select_and_clean(value[indx])
             # Scalar, string, etc so return as is
             else:
                 result[key] = value
