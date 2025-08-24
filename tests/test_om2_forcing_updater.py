@@ -1,309 +1,279 @@
 from pathlib import Path
 import pytest
 from experiment_generator.om2_forcing_updater import Om2ForcingUpdater
-from experiment_generator.tmp_parser.json_parser import read_json, write_json
+import experiment_generator.om2_forcing_updater as om2_forcing_module
+import json
 
 
 @pytest.fixture
-def tmp_repo(tmp_path: Path) -> Path:
-    """
-    A temp repo dir with a minimal atmosphere/forcing.json.
-    """
-    repo = tmp_path / "repo"
-    (repo / "atmosphere").mkdir(parents=True)
-    forcing = {
-        "description": "JRA55-do v1.4.0 IAF forcing",
+def sample_input():
+    return {
         "inputs": [
-            {"filename": "INPUT/rsds.nc", "fieldname": "rsds", "cname": "swfld_ai"},
-            {"filename": "INPUT/uas.nc", "fieldname": "uas", "cname": "uwnd_ai"},
-            {"filename": "INPUT/tas.nc", "fieldname": "tas", "cname": "tair_ai"},
-        ],
+            {
+                "fieldname": "tas",
+                "filename": "INPUT/tas.nc",
+                "cname": "tair_ai",
+            },
+            {
+                "fieldname": "uas",
+                "filename": "INPUT/uas.nc",
+                "cname": "uwnd_ai",
+            },
+        ]
     }
-    write_json(forcing, repo / "atmosphere" / "forcing.json")
-    return repo
 
 
-def test_list_of_perturbs(tmp_repo: Path):
+@pytest.fixture
+def patch_json_and_utils(monkeypatch, sample_input):
     """
-    Ensures perturbations are persisted as a list
+    Patch the read_json, write_json and update_config_entries functions
+    to use sample input.
     """
-    updater = Om2ForcingUpdater(tmp_repo)
+    calls = {
+        "read_json": [],
+        "write_json": [],
+        "update_config_entries": [],
+    }
+
+    def dummy_read_json(path):
+        calls["read_json"].append(path)
+        return {"inputs": sample_input["inputs"]}
+
+    def dummy_write_json(data, path):
+        tmp_data = json.dumps(data)
+        calls["write_json"].append((tmp_data, path))
+
+    def dummy_update_config_entries(base: dict, updates: dict):
+        calls["update_config_entries"].append((base, updates))
+        for k, v in updates.items():
+            base[k] = v
+
+    monkeypatch.setattr(om2_forcing_module, "read_json", dummy_read_json, raising=True)
+    monkeypatch.setattr(om2_forcing_module, "write_json", dummy_write_json, raising=True)
+    monkeypatch.setattr(om2_forcing_module, "update_config_entries", dummy_update_config_entries, raising=True)
+    return calls
+
+
+def test_update_forcing_params_correct_path(tmp_repo_dir, patch_json_and_utils):
+    """
+    - dict `perturbations` is a list
+    - perturbations is list[dict]
+    - update_config_entries is invoked per fieldname
+    - write_json is called once with merged content
+    """
+    updater = Om2ForcingUpdater(tmp_repo_dir)
+
     params = {
+        "tas": {
+            "filename": "NEW/tas_{{year}}.nc",
+            "cname": "tair_ai",
+            "perturbations": {
+                "type": "scaling",
+                "dimension": "temporal",
+                "value": "../test_data/scaling.tas.1990_1991.nc",
+                "calendar": "forcing",
+                "comment": "scale up",
+            },
+        },
         "uas": {
-            "filename": "INPUT/uas_new.nc",
+            "filename": "NEW/uas_{{year}}.nc",
             "cname": "uwnd_ai",
             "perturbations": [
                 {
-                    "type": "scaling",
-                    "dimension": "spatial",
-                    "value": "INPUT/uas_TP.nc",
-                    "calendar": "forcing",
-                    "comment": "increase TP winds",
-                },
-                {
                     "type": "offset",
-                    "dimension": "constant",
-                    "value": 5,
-                    "calendar": "forcing",
-                    "comment": "",
-                },
-                {
-                    "type": "separable",
-                    "dimension": ["temporal", "spatial"],
-                    "value": ["T.nc", "S.nc"],
+                    "dimension": ["spatial", "temporal"],
+                    "value": ["../test_data/temporal.uas.1990_1991.nc", "../test_data/spatial.uas.1990_1991.nc"],
                     "calendar": "experiment",
-                    "comment": "",
-                },
+                    "comment": "bias adjust",
+                }
             ],
-        }
+        },
     }
+    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"))
 
-    updater.update_forcing_params(params, Path("atmosphere/forcing.json"))
+    # read and write
+    assert patch_json_and_utils["read_json"] == [tmp_repo_dir / "atmosphere" / "forcing.json"]
+    assert len(patch_json_and_utils["write_json"]) == 1
+    written_data, written_path = patch_json_and_utils["write_json"][0]
+    assert written_path == tmp_repo_dir / "atmosphere" / "forcing.json"
 
-    data = read_json(tmp_repo / "atmosphere" / "forcing.json")
-    uas = next(x for x in data["inputs"] if x["fieldname"] == "uas")
-    assert uas["filename"] == "INPUT/uas_new.nc"
-    assert isinstance(uas.get("perturbations"), list)
-    assert len(uas["perturbations"]) == 3
-    assert uas["perturbations"][0]["type"] == "scaling"
-    assert uas["perturbations"][1]["dimension"] == "constant"
-    assert uas["perturbations"][2]["dimension"] == ["temporal", "spatial"]
+    assert len(patch_json_and_utils["update_config_entries"]) == 2
 
 
-def test_dict_of_single_perturb(tmp_repo: Path):
+def test_all_removed_perturbations_warn_and_skip(tmp_repo_dir, patch_json_and_utils, monkeypatch):
     """
-    Input a single dict perturbation, it should be wrapped to a list
+    Cleaning branch where every perturbation is marked for removal,
+    warn and do NOT set updates['perturbations'] (early return).
     """
-    updater = Om2ForcingUpdater(tmp_repo)
+    # Make "REMOVE"
+    monkeypatch.setattr(om2_forcing_module, "REMOVED", {"REMOVE"}, raising=True)
+
+    updater = Om2ForcingUpdater(tmp_repo_dir)
     params = {
         "tas": {
-            "filename": "INPUT/tas_new.nc",
+            "filename": "NEW/tas.nc",
             "cname": "tair_ai",
-            "perturbations": {
-                "type": "offset",
-                "dimension": "constant",
-                "value": 10,
-                "calendar": "forcing",
-                "comment": "",
-            },
+            "perturbations": [
+                # all perturbations are marked for removal
+                {"type": "REMOVE", "dimension": "REMOVE", "value": "REMOVE", "calendar": "REMOVE", "comment": "REMOVE"},
+                # also ensure 'type' alone being REMOVED is enough
+                {"type": "REMOVE", "dimension": "spatial", "value": 1, "calendar": "forcing", "comment": "x"},
+            ],
         }
-    }
-
-    updater.update_forcing_params(params, Path("atmosphere/forcing.json"))
-
-    data = read_json(tmp_repo / "atmosphere" / "forcing.json")
-    tas = next(x for x in data["inputs"] if x["fieldname"] == "tas")
-    assert tas["filename"] == "INPUT/tas_new.nc"
-    assert isinstance(tas.get("perturbations"), list)
-    assert len(tas["perturbations"]) == 1
-    assert tas["perturbations"][0]["type"] == "offset"
-    assert tas["perturbations"][0]["dimension"] == "constant"
-
-
-def test_no_perturbations_key(tmp_repo: Path):
-    """
-    No 'perturbations' key in updates, should still update others but not perturbations.
-    """
-    updater = Om2ForcingUpdater(tmp_repo)
-    params = {
-        "rsds": {
-            "filename": "INPUT/rsds_new.nc",
-            "cname": "swfld_ai",
-            # No perturbations provided
-        }
-    }
-
-    updater.update_forcing_params(params, Path("atmosphere/forcing.json"))
-
-    data = read_json(tmp_repo / "atmosphere" / "forcing.json")
-    rsds = next(x for x in data["inputs"] if x["fieldname"] == "rsds")
-    assert rsds["filename"] == "INPUT/rsds_new.nc"
-    assert "perturbations" not in rsds  # No perturbations key should be present
-
-
-@pytest.mark.parametrize("not_existed", [None, {}, []])
-def test_single_field_with_perturbation_no_content(tmp_repo: Path, not_existed):
-    """
-    For None, {} or [], it should warn and remove the perturbations key.
-    """
-    updater = Om2ForcingUpdater(tmp_repo)
-    fieldname = "tas"
-    updates = {
-        "filename": "INPUT/tas_new.nc",
-        "cname": "tair_ai",
-        "perturbations": not_existed,  # No perturbations provided
     }
 
     with pytest.warns(UserWarning):
-        updater.update_forcing_params({fieldname: updates}, Path("atmosphere/forcing.json"))
+        updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"))
 
-    data = read_json(tmp_repo / "atmosphere" / "forcing.json")
-    tas = next(x for x in data["inputs"] if x["fieldname"] == "tas")
-    assert "perturbations" not in tas  # No perturbations key should be present
+    assert len(patch_json_and_utils["update_config_entries"]) == 1
+    _, updates = patch_json_and_utils["update_config_entries"][0]
+    assert "perturbations" not in updates
 
 
-def test_missing_required_key_raises(tmp_repo: Path):
+def test_some_removed_but_others_cleaned_and_kept(tmp_repo_dir, patch_json_and_utils, monkeypatch):
     """
-    Missing 'filename' must raise a ValueError
+    Cleaning branch where some items are removed and the remaining
+    cleaned list is validated and assigned back into updates.
     """
-    updater = Om2ForcingUpdater(tmp_repo)
+    monkeypatch.setattr(om2_forcing_module, "REMOVED", {"REMOVE"}, raising=True)
+
+    updater = Om2ForcingUpdater(tmp_repo_dir)
     params = {
         "uas": {
-            # missing 'filename'
-            "cname": "uwnd_ai",
-        }
-    }
-    with pytest.raises(ValueError) as e:
-        updater.update_forcing_params(params, Path("atmosphere/forcing.json"))
-    assert "non-empty 'filename'" in str(e.value)
-
-
-def test_missing_perturbation_fields(tmp_repo: Path):
-    """
-    Missing required fields in perturbation should raise ValueError
-    """
-    updater = Om2ForcingUpdater(tmp_repo)
-    fieldname = "tas"
-    updates = {
-        "filename": "INPUT/tas_new.nc",
-        "cname": "tair_ai",
-        "perturbations": {
-            "type": "offset",  # Missing 'dimension', 'value', 'calendar', 'comment'
-        },
-    }
-
-    with pytest.raises(
-        ValueError, match="Perturbation is missing required fields: dimension, value, calendar, comment"
-    ):
-        updater._preprocess_perturbations(fieldname, updates)
-
-
-def test_invalid_perturbation_type(tmp_repo: Path):
-    """
-    Ensure invalid perturbation type raises a ValueError
-    """
-    updater = Om2ForcingUpdater(tmp_repo)
-    fieldname = "tas"
-    updates = {
-        "filename": "INPUT/tas_new.nc",
-        "cname": "tair_ai",
-        "perturbations": {
-            "type": "invalid_type",  # Invalid type
-            "dimension": "constant",
-            "value": 10,
-            "calendar": "forcing",
-            "comment": "",
-        },
-    }
-
-    with pytest.raises(ValueError, match="Invalid perturbation type: invalid_type"):
-        updater._preprocess_perturbations(fieldname, updates)
-
-
-def test_field_not_found_raises(tmp_repo: Path):
-    """
-    Ensure that if the fieldname does not exist in forcing.json, it raises ValueError
-    """
-    updater = Om2ForcingUpdater(tmp_repo)
-    params = {
-        "not_an_existed_field": {
-            "filename": "INPUT/not_an_existed_field.nc",
-            "cname": "xx",
-        }
-    }
-    with pytest.raises(ValueError) as e:
-        updater.update_forcing_params(params, Path("atmosphere/forcing.json"))
-    assert "Not found a valid perturbed fieldname" in str(e.value)
-
-
-def test_invalid_perturbation_dimension(tmp_repo: Path):
-    """
-    Ensure that an invalid perturbation dimension raises a ValueError
-    """
-    updater = Om2ForcingUpdater(tmp_repo)
-    fieldname = "tas"
-    updates = {
-        "filename": "INPUT/tas_new.nc",
-        "cname": "tair_ai",
-        "perturbations": {
-            "type": "scaling",
-            "dimension": "invalid_dimension",  # Invalid dimension
-            "value": 10,
-            "calendar": "forcing",
-            "comment": "",
-        },
-    }
-
-    with pytest.raises(ValueError, match="Invalid perturbation dimension: invalid_dimension"):
-        updater._preprocess_perturbations(fieldname, updates)
-
-
-@pytest.mark.parametrize("dim", (["temporal", "spatial"], ["spatial", "temporal"]))
-def test_valid_separable_dimension_orders(tmp_repo: Path, dim):
-    """
-    Separable accepts either ['temporal', 'spatial'] or ['spatial', 'temporal']
-    """
-    updater = Om2ForcingUpdater(tmp_repo)
-    params = {
-        "uas": {
-            "filename": "INPUT/uas_new.nc",
+            "filename": "NEW/uas.nc",
             "cname": "uwnd_ai",
             "perturbations": [
+                # removed
+                {"type": "REMOVE", "dimension": "REMOVE", "value": "REMOVE", "calendar": "REMOVE", "comment": "REMOVE"},
+                # kept (valid)
                 {
                     "type": "separable",
-                    "dimension": dim,
-                    "value": ["T.nc", "S.nc"],
-                    "calendar": "forcing",
-                    "comment": "",
-                }
+                    "dimension": ["temporal", "spatial"],
+                    "value": ["../t.nc", "../s.nc"],
+                    "calendar": "experiment",
+                    "comment": "keep me",
+                },
             ],
         }
     }
-    # Should not raise
-    updater.update_forcing_params(params, Path("atmosphere/forcing.json"))
 
-    data = read_json(tmp_repo / "atmosphere" / "forcing.json")
+    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"))
 
-    uas = next(x for x in data["inputs"] if x["fieldname"] == "uas")
-    assert isinstance(uas.get("perturbations"), list)
-    assert uas["perturbations"][0]["dimension"] == dim
+    assert len(patch_json_and_utils["update_config_entries"]) == 1
+    _, updates = patch_json_and_utils["update_config_entries"][0]
+    perts = updates["perturbations"]
+    assert isinstance(perts, list) and len(perts) == 1
+    assert perts[0]["type"] == "separable"
+    assert perts[0]["dimension"] in (["temporal", "spatial"], ["spatial", "temporal"])
 
+    assert len(patch_json_and_utils["write_json"]) == 1
+    written_json, _ = patch_json_and_utils["write_json"][0]
+    payload = json.loads(written_json)
 
-def test_invalid_calendar_raises(tmp_repo: Path):
-    """
-    Calendar must be 'forcing' or 'experiment'
-    """
-    updater = Om2ForcingUpdater(tmp_repo)
-    params = {
-        "uas": {
-            "filename": "INPUT/uas_new.nc",
-            "cname": "uwnd_ai",
-            "perturbations": [
-                {
-                    "type": "offset",
-                    "dimension": "constant",
-                    "value": 2,
-                    "calendar": "invalid",  # invalid calendar
-                    "comment": "",
-                }
-            ],
-        }
-    }
-    with pytest.raises(ValueError) as e:
-        updater.update_forcing_params(params, Path("atmosphere/forcing.json"))
-    assert "Invalid perturbation calendar" in str(e.value)
+    uas_entry = next(x for x in payload["inputs"] if x["fieldname"] == "uas")
+    assert len(uas_entry["perturbations"]) == 1
+    assert uas_entry["perturbations"][0]["type"] == "separable"
 
 
-@pytest.mark.parametrize("invalid", ["not a dict or list", 1.0, [1, 2, 3]])
-def test_invalid_perturbations_container_type_raises(tmp_repo: Path, invalid):
-    updater = Om2ForcingUpdater(tmp_repo)
+def test_dict_perturbations(tmp_repo_dir, patch_json_and_utils):
+    updater = Om2ForcingUpdater(tmp_repo_dir)
+
     params = {
         "tas": {
-            "filename": "INPUT/tas.nc",
+            "filename": "NEW/tas_{{year}}.nc",
             "cname": "tair_ai",
-            "perturbations": invalid,
+            "perturbations": {
+                "type": "scaling",
+                "dimension": "temporal",
+                "value": "../test_data/scaling.tas.1990_1991.nc",
+                "calendar": "forcing",
+                "comment": "scale up",
+            },
         }
     }
-    with pytest.raises(TypeError) as e:
-        updater.update_forcing_params(params, Path("atmosphere/forcing.json"))
-    assert str(e.value) == "-- forcing.json 'tas': 'perturbations' must be a dict or list of dicts"
+    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"))
+
+    assert len(patch_json_and_utils["update_config_entries"]) == 1
+    _, updates = patch_json_and_utils["update_config_entries"][0]
+    assert isinstance(updates["perturbations"], list)
+    assert len(updates["perturbations"]) == 1
+    assert updates["perturbations"][0]["type"] == "scaling"
+
+
+def test_fieldname_not_found_raises(tmp_repo_dir, patch_json_and_utils):
+    updater = Om2ForcingUpdater(tmp_repo_dir)
+    tmp = {"not_in_file": {"filename": "x.nc", "cname": "X"}}
+    with pytest.raises(ValueError):
+        updater.update_forcing_params(tmp, target_file=Path("atmosphere/forcing.json"))
+    assert patch_json_and_utils["write_json"] == []
+
+
+@pytest.mark.parametrize("empty", [None, {}, []])
+def test_empty_or_none_perturbations_warn_and_removed(tmp_repo_dir, patch_json_and_utils, empty):
+    updater = Om2ForcingUpdater(tmp_repo_dir)
+    tmp = {"tas": {"filename": "x.nc", "cname": "X", "perturbations": empty}}
+    with pytest.warns(UserWarning):
+        updater.update_forcing_params(tmp, target_file=Path("atmosphere/forcing.json"))
+    # ensure preprocess removed the key before merging
+    assert len(patch_json_and_utils["update_config_entries"]) == 1
+    _, updates = patch_json_and_utils["update_config_entries"][0]
+    assert "perturbations" not in updates
+
+
+@pytest.mark.parametrize("invalid", [42, "oops", [1, 2], [{"type": "scaling"}, "invalid"]])
+def test_invalid_perturbations_type_raises(tmp_repo_dir, patch_json_and_utils, invalid):
+    updater = Om2ForcingUpdater(tmp_repo_dir)
+    tmp = {"tas": {"filename": "x.nc", "cname": "X", "perturbations": invalid}}
+    with pytest.raises(TypeError):
+        updater.update_forcing_params(tmp, target_file=Path("atmosphere/forcing.json"))
+    assert patch_json_and_utils["write_json"] == []
+
+
+@pytest.mark.parametrize("ptype", ["", None, "wrongtype"])
+def test_validate_single_perturbation_wrong_type(tmp_repo_dir, ptype):
+    updater = Om2ForcingUpdater(tmp_repo_dir)
+    pert = {
+        "type": ptype,
+        "dimension": "temporal",
+        "value": "../test_data/temporal.tas.1990_1991.nc",
+        "calendar": "forcing",
+        "comment": "x",
+    }
+    with pytest.raises(ValueError):
+        updater._validate_single_perturbation(pert)
+
+
+@pytest.mark.parametrize(
+    "dim",
+    [
+        123,
+        "space",  # not allowed
+        ["temporal"],  # list but not the two-item allowed perms
+        ["spatial", "temporal", "x"],  # extra item
+    ],
+)
+def test_validate_single_perturbation_invalid_dimension(tmp_repo_dir, dim):
+    updater = Om2ForcingUpdater(tmp_repo_dir)
+    pert = {
+        "type": "offset",
+        "dimension": dim,
+        "value": "../test_data/offset.tas.1990_1991.nc",
+        "calendar": "forcing",
+        "comment": "wrong dim",
+    }
+    with pytest.raises(ValueError):
+        updater._validate_single_perturbation(pert)
+
+
+@pytest.mark.parametrize("calendar", ["", None, "weird"])
+def test_validate_single_perturbation_wrong_calendar(tmp_repo_dir, calendar):
+    updater = Om2ForcingUpdater(tmp_repo_dir)
+    pert = {
+        "type": "separable",
+        "dimension": "spatiotemporal",
+        "value": "../test_data/spatiotemporal.tas.1990_1991.nc",
+        "calendar": calendar,
+        "comment": "wrong calendar",
+    }
+    with pytest.raises(ValueError):
+        updater._validate_single_perturbation(pert)

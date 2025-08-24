@@ -103,6 +103,11 @@ class RunseqRecorder(_RecorderBase):
         self._record("update_nuopc_runseq", params, filename)
 
 
+class Om2forcingRecorder(_RecorderBase):
+    def update_forcing_params(self, params, filename):
+        self._record("update_forcing_params", params, filename)
+
+
 @pytest.fixture(autouse=True)
 def patch_updaters(monkeypatch):
     """
@@ -113,14 +118,23 @@ def patch_updaters(monkeypatch):
     nuopc_runconfig_recorder = RunconfigRecorder()
     mom6_input_recorder = Mom6Recorder()
     nuopc_runseq_recorder = RunseqRecorder()
+    om2_forcing_recorder = Om2forcingRecorder()
 
     monkeypatch.setattr(pert_exp, "F90NamelistUpdater", lambda *_: f90_recorder)
     monkeypatch.setattr(pert_exp, "ConfigUpdater", lambda *_: payuconfig_recorder)
     monkeypatch.setattr(pert_exp, "NuopcRunConfigUpdater", lambda *_: nuopc_runconfig_recorder)
     monkeypatch.setattr(pert_exp, "Mom6InputUpdater", lambda *_: mom6_input_recorder)
     monkeypatch.setattr(pert_exp, "NuopcRunseqUpdater", lambda *_: nuopc_runseq_recorder)
+    monkeypatch.setattr(pert_exp, "Om2ForcingUpdater", lambda *_: om2_forcing_recorder)
 
-    return f90_recorder, payuconfig_recorder, nuopc_runconfig_recorder, mom6_input_recorder, nuopc_runseq_recorder
+    return (
+        f90_recorder,
+        payuconfig_recorder,
+        nuopc_runconfig_recorder,
+        mom6_input_recorder,
+        nuopc_runseq_recorder,
+        om2_forcing_recorder,
+    )
 
 
 @pytest.fixture
@@ -192,5 +206,27 @@ DT = 1800.0                     !   [s]
                                 ! be an integer fraction of the forcing time-step (DT_FORCING in ocean-only mode
                                 ! or the coupling timestep in coupled mode.)
         """
+    )
+    (tmp_path / "atmosphere").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "atmosphere" / "forcing.json").write_text(
+        """
+{
+  "description": "JRA55-do v1.4.0 IAF forcing",
+  "inputs": [
+    {
+      "filename":
+        "INPUT/tas_input4MIPs_atmosphericState_OMIP_MRI-JRA55-do-1-4-0_gr_{{year}}01010000-{{year}}12312100.nc",
+      "fieldname": "tas",
+      "cname": "tair_ai"
+    },
+    {
+      "filename":
+        "INPUT/uas_input4MIPs_atmosphericState_OMIP_MRI-JRA55-do-1-4-0_gr_{{year}}01010000-{{year}}12312100.nc",
+      "fieldname": "uas",
+      "cname": "uwnd_ai"
+    }
+  ]
+}
+"""
     )
     return tmp_path
