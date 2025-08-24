@@ -2,6 +2,7 @@ from pathlib import Path
 from .tmp_parser.json_parser import read_json, write_json
 from .utils import update_config_entries
 import warnings
+from .common_var import REMOVED
 
 
 class Om2ForcingUpdater:
@@ -21,10 +22,6 @@ class Om2ForcingUpdater:
         file_read = read_json(forcing_path)
 
         for fieldname, updates in param_dict.items():
-            for required_key in ("filename", "cname"):
-                if required_key not in updates or not updates[required_key]:
-                    raise ValueError(f"The yaml input {fieldname} must have a non-empty '{required_key}' key!")
-
             idx = self._find_matching_param_index(file_read["inputs"], fieldname)
             if idx is None:
                 raise ValueError("Not found a valid perturbed fieldname!")
@@ -76,21 +73,38 @@ class Om2ForcingUpdater:
         else:
             raise TypeError(f"-- forcing.json '{fieldname}': 'perturbations' must be a dict or list of dicts")
 
+        required = ["type", "dimension", "value", "calendar", "comment"]
+
+        def _is_to_remove(pert: dict) -> bool:
+            if all(pert.get(k) in REMOVED for k in required):
+                return True
+            if pert.get("type") in REMOVED:
+                return True
+            return False
+
+        cleaned = [p for p in perts if not _is_to_remove(p)]
+        if not cleaned:
+            warnings.warn(
+                f"-- forcing.json: all perturbations for field '{fieldname}' are marked for removal; "
+                "skipping perturbations.",
+                UserWarning,
+            )
+            # Drop the key so it doesn't carry an empty/removed set forward
+            updates.pop("perturbations", None)
+            return
+
         # validate each dict
-        for pert in perts:
+        for pert in cleaned:
             self._validate_single_perturbation(pert)
+
+        # keep only the cleaned ones
+        updates["perturbations"] = cleaned
 
     @staticmethod
     def _validate_single_perturbation(pert: dict) -> None:
         """
         Validate a single perturbation dict.
-        Required keys: type, dimension, value, calendar, comment.
         """
-        required = ["type", "dimension", "value", "calendar", "comment"]
-        missing = [p for p in required if p not in pert]
-        if missing:
-            raise ValueError(f"Perturbation is missing required fields: {', '.join(missing)}")
-
         if pert["type"] not in {"scaling", "offset", "separable"}:
             raise ValueError(f"Invalid perturbation type: {pert['type']}")
 
