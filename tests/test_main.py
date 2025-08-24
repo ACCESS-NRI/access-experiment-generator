@@ -1,5 +1,4 @@
 import sys
-import experiment_generator.main as main_module
 import experiment_generator.experiment_generator as exp_gen
 from experiment_generator.experiment_generator import VALID_MODELS
 from experiment_generator import utils
@@ -8,6 +7,8 @@ import runpy
 
 
 def test_main_runs_with_i_flag(tmp_path, monkeypatch):
+    import experiment_generator.main as main_module
+
     yaml = tmp_path / "example.yaml"
     yaml.write_text(
         f"""
@@ -37,6 +38,8 @@ model_type: {VALID_MODELS[0]}
 
 
 def test_main_uses_default_yaml_when_present(tmp_path, monkeypatch):
+    import experiment_generator.main as main_module
+
     default_yaml = tmp_path / "Experiment_generator.yaml"
     default_yaml.write_text(
         f"""
@@ -68,6 +71,8 @@ model_type: {VALID_MODELS[1]}
 
 
 def test_main_errors_when_no_yaml_provided_and_default_missing(tmp_path, monkeypatch, capsys):
+    import experiment_generator.main as main_module
+
     monkeypatch.chdir(tmp_path)
 
     monkeypatch.setattr(sys, "argv", ["prog"])
@@ -106,6 +111,8 @@ def test_exec_main(tmp_path, monkeypatch):
     monkeypatch.setattr(exp_gen, "ExperimentGenerator", DummyEG, raising=True)
 
     monkeypatch.setattr(sys, "argv", ["prog", "-i", "dummy.yaml"])
+
+    sys.modules.pop("experiment_generator.main", None)
 
     runpy.run_module("experiment_generator.main", run_name="__main__", alter_sys=True)
 

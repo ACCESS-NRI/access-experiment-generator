@@ -60,9 +60,14 @@ def test_collect_defs_warns_and_skips_block_without_branches(tmp_repo_dir, indat
 
 
 def test_apply_updates_with_correct_updaters(tmp_repo_dir, patch_updaters, indata):
-    f90_recorder, payuconfig_recorder, nuopc_runconfig_recorder, mom6_input_recorder, nuopc_runseq_recorder = (
-        patch_updaters
-    )
+    (
+        f90_recorder,
+        payuconfig_recorder,
+        nuopc_runconfig_recorder,
+        mom6_input_recorder,
+        nuopc_runseq_recorder,
+        om2_forcing_recorder,
+    ) = patch_updaters
 
     expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
 
@@ -74,6 +79,13 @@ def test_apply_updates_with_correct_updaters(tmp_repo_dir, patch_updaters, indat
             "nuopc.runseq": {"cpl_dt": 20},
             "nuopc.runconfig": {"ALLCOMP_attributes": {"ATM_model": "satm"}},
             "MOM_input": {"DT": 3600.0},
+            "atmosphere/forcing.json": {
+                "tas": {
+                    "perturbations": [
+                        {"type": "REMOVE", "dimension": "temporal", "value": "test_data/temporal.RYF.rsds.1990_1991.nc"}
+                    ]
+                }
+            },
         }
     )
 
@@ -91,6 +103,17 @@ def test_apply_updates_with_correct_updaters(tmp_repo_dir, patch_updaters, indat
         "nuopc.runconfig",
     )
     assert mom6_input_recorder.calls[0] == ("update_mom6_params", {"DT": 3600.0}, "MOM_input")
+    assert om2_forcing_recorder.calls[0] == (
+        "update_forcing_params",
+        {
+            "tas": {
+                "perturbations": [
+                    {"type": "REMOVE", "dimension": "temporal", "value": "test_data/temporal.RYF.rsds.1990_1991.nc"}
+                ]
+            }
+        },
+        "atmosphere/forcing.json",
+    )
 
 
 def test_manage_control_expt_applies_updates_and_commits(tmp_repo_dir, indata, patch_git):
@@ -103,6 +126,7 @@ def test_manage_control_expt_applies_updates_and_commits(tmp_repo_dir, indata, p
         "MOM_input": {"DT": 1800.0},
         "nuopc.runseq": {"cpl_dt": 3600},
         "nuopc.runconfig": {"ALLCOMP_attributes": {"ATM_model": "satm"}},
+        "atmosphere/forcing.json": {"tas": {"perturbations": [{"type": "REMOVE"}]}},
     }
 
     indata = {**indata, "Control_Experiment": control_block}
@@ -146,9 +170,7 @@ def test_manage_perturb_expt_creat_branches_applies_updates_and_commits(
         directory=tmp_repo_dir, indata={**indata, "Perturbation_Experiment": perturb_block}
     )
 
-    f90_recorder, payuconfig_recorder, nuopc_runconfig_recorder, mom6_input_recorder, nuopc_runseq_recorder = (
-        patch_updaters
-    )
+    f90_recorder, payuconfig_recorder, _, _, _, _ = patch_updaters
 
     expt.manage_perturb_expt()
 
