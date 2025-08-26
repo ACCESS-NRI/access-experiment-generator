@@ -24,7 +24,7 @@ class Om2ForcingUpdater:
         for fieldname, updates in param_dict.items():
             idx = self._find_matching_param_index(file_read["inputs"], fieldname)
             if idx is None:
-                raise ValueError("Not found a valid perturbed fieldname!")
+                raise ValueError("Did not find a valid perturbed fieldname!")
 
             base = file_read["inputs"][idx]
 
