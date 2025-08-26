@@ -2,5 +2,5 @@ ignore:
   # https://docs.codecov.com/docs/ignoring-paths
   - "src/experiment_generator/tmp_parser/**/*"
 codecov:
-  branch: 19-add-supoort-om2-forcing
+  strict_yaml_branch: 19-add-supoort-om2-forcing
 
