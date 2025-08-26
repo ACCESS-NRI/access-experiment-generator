@@ -110,7 +110,7 @@ class Om2ForcingUpdater:
 
         dim = pert["dimension"]
         accepted_dim = (isinstance(dim, str) and dim in {"spatial", "temporal", "constant", "spatiotemporal"}) or (
-            isinstance(dim, list) and (dim == ["temporal", "spatial"] or dim == ["spatial", "temporal"])
+            isinstance(dim, list) and dim == ["temporal", "spatial"]
         )
         if not accepted_dim:
             raise ValueError(f"Invalid perturbation dimension: {dim}")
