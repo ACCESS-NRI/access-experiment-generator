@@ -269,9 +269,9 @@ def test_validate_single_perturbation_invalid_dimension(tmp_repo_dir, dim):
 def test_validate_single_perturbation_wrong_calendar(tmp_repo_dir, calendar):
     updater = Om2ForcingUpdater(tmp_repo_dir)
     pert = {
-        "type": "separable",
+        "type": "scaling",
         "dimension": "spatiotemporal",
-        "value": "../test_data/spatiotemporal.tas.1990_1991.nc",
+        "value": "../test_data/scaling.tas.1990_1991.nc",
         "calendar": calendar,
         "comment": "wrong calendar",
     }
