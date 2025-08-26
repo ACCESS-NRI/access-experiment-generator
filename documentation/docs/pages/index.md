@@ -6,6 +6,7 @@ The **Experiment Generator** is a tool designed to streamline the creation of on
 
 # Why perturbation experiments?
 Climate models contain thousands of uncertain parameters. Systematically varying them helps you:
+
 - Quantify sensitivity (which parameters matter most)
 - Assess uncertainty (ensembles instead of single runs)
 - Tune models (match observations more robustly)
@@ -17,6 +18,7 @@ Climate models contain thousands of uncertain parameters. Systematically varying
 ## 1. Parameter perturbation via YAML input
 
 Users define a suite of parameter changes in a YAML configuration file (the “experiment plan”). Each set of changes corresponds to a new experiment variant. The generator:
+
  - Reads the YAML file,
  - [Optional] Applies the changes to the control experiment configuration files,
  - Produces modified configurations for each variant.
@@ -26,6 +28,7 @@ For example, you specify different values for certain Fortran namelist parameter
 ## 2. Branch-based version control workflow
 
 The generator uses Git branching to manage the new experiments. 
+
 - Start from a control experiment on a given Git branch or commit, 
 - Create a new Git branch for each perturbation experiment,
 - Appliy the parameter changes, and commits them on that branch. 
@@ -125,6 +128,7 @@ Perturbation_Experiment:
   # Parameter variations
 ```
 This tells the generator to:
+
 - Clone `ACCESS-NRI/access-om2-configs` at commit `fce24e3`,
 - Create a working directory `my-experiment`, which include all the experiments,
 - Use `1deg_jra55_ryf` inside as the central config hub.
@@ -184,6 +188,7 @@ To represent these edits in your YAML plan, place them under the `Control_Experi
 > Preserve the correct hierarchy to match the file structure.
 
 For example, 
+
 - In `accessom2.nml`, the Fortran namelist parameter `restart_period` is inside the `date_manager_nml` group, so the YAML hierarchy must reflect this parent–child relationship.
 - In `config.yaml`, parameters such as `queue` and `walltime` appear at the top level, so they can be listed directly.
 - For files inside subdirectories (e.g. `ice/cice_in.nml`), use the relative path from the repository to the file, then follow the same hierarchy-matching approach.
@@ -270,6 +275,7 @@ Perturbation_Experiment:
 #### How the generator processes a block
 
 For the example above, the generator will:
+
 1. Start from the control branch (`ctrl`).
 2. For each branch in `Parameter_block1_branches`:
  - Create the branch from control (or check it out if it already exists).
