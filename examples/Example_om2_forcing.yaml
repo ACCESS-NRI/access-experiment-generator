@@ -29,8 +29,8 @@ Control_Experiment:
 # - Some keys need multiple entries per branch (e.g., `dimension` combining spatial + temporal).
 #   You can use block-style nested lists for clarity:
 #     dimension:
-#       - - "spatial"
-#         - "temporal"   # for perturb_1
+#       - - "temporal"
+#         - "spatial"   # for perturb_1
 #       - ~              # perturb_2 not used
 # Another example with both branches:
 #     dimension:
