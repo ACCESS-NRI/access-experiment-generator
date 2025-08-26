@@ -1,5 +1,3 @@
-Welcome to the access-experiment-generator wiki!
-
 # Overview
 
 The **Experiment Generator** is a tool designed to streamline the creation of one or more experiment configurations from a base “control” experiment setup. Its primary goal is to reduce manual editing and ensure consistent, repeatable workflows, especially when creating large ensembles of experiments. By automating the generation of multiple experiment variants (e.g. parameter perturbations), the **Experiment Generator** helps researchers efficiently explore sensitivity studies and runs.
@@ -62,12 +60,6 @@ source <path/to/venv>/bin/activate
 pip install experiment-generator
 ```
 
-or install from the `accessnri` conda channel,
-
-```
-conda install -c accessnri experiment-generator
-```
-
 After installation, verify the setup by checking,
 
 ```bash
@@ -75,19 +67,19 @@ $ experiment-generator --help
 usage: experiment-generator [-h] [-i INPUT_YAML_FILE]
 
 Manage ACCESS experiments using configurable YAML input.
-If no YAML file is specified, the tool will look for 'Experiment_manager.yaml' in the current directory.
+If no YAML file is specified, the tool will look for 'Experiment_generator.yaml' in the current directory.
 If that file is missing, you must specify one with -i / --input-yaml-file.
 
 options:
   -h, --help            show this help message and exit
   -i INPUT_YAML_FILE, --input-yaml-file INPUT_YAML_FILE
                         Path to the YAML file specifying parameter values for experiment runs.
-                        Defaults to 'Experiment_manager.yaml' if present in the current directory.
+                        Defaults to 'Experiment_generator.yaml' if present in the current directory.
 ```
 
 ## Development setup
 
-for contributors and developers, setup a development environment,
+For contributors and developers, setup a development environment,
 
 ```
 git clone https://github.com/ACCESS-NRI/access-experiment-generator.git
@@ -182,10 +174,10 @@ $ sed -n '78p;81p;106p;109p;110p' ice/cice_in.nml
 ```
 To represent these edits in your YAML plan, place them under the `Control_Experiment` key. For each file:
 
-> [!IMPORTANT]
-> Specify the file name exactly as it appears in the repository.
->
-> Preserve the correct hierarchy to match the file structure.
+!!! important "Important"
+    Specify the file name exactly as it appears in the repository.
+
+    Preserve the correct hierarchy to match the file structure.
 
 For example, 
 
@@ -211,10 +203,10 @@ Control_Experiment:
     thermo_nml:
       chio: 0.001
 ```
-> [!NOTE]
-> `Control_Experiment` is a required YAML key - the parser depends on it being present.
->
-> If you don’t want to change anything in the `ctrl` branch, you can just leave it empty (no file paths or parameters underneath).
+!!! note "Note"
+    `Control_Experiment` is a required YAML key - the parser depends on it being present.
+
+     If you don’t want to change anything in the `ctrl` branch, you can just leave it empty (no file paths or parameters underneath).
 
 After running the generator such as follows, a new `ctrl` branch is created with these changes committed.
 
@@ -267,10 +259,10 @@ Perturbation_Experiment:
     - Fortran namelist parameters are grouped under their `&namelist_group_name` (as in `shortwave_nml` or `thermo_nml`),
     - YAML configuration files follow their native key hierarchy
 
-> [!IMPORTANT]
-> You can have one or more perturbation blocks in the same YAML.
-> 
-> The branch list key must be named `<blockname>_branches` — for example, `Parameter_block1_branches` for `Parameter_block1`.
+!!! important "Important"
+    You can have one or more perturbation blocks in the same YAML.
+ 
+    The branch list key must be named `<blockname>_branches` — for example, `Parameter_block1_branches` for `Parameter_block1`.
 
 #### How the generator processes a block
 
@@ -278,6 +270,7 @@ For the example above, the generator will:
 
 1. Start from the control branch (`ctrl`).
 2. For each branch in `Parameter_block1_branches`:
+
  - Create the branch from control (or check it out if it already exists).
  - Apply the parameter values corresponding to that branch index:
    - `perturb_1` uses the first value in each list (`albicei=0.36`, `agm_closure_length=2.5e4`, etc.).
@@ -285,6 +278,7 @@ For the example above, the generator will:
  - Commit the changes so the branch contains only its intended modifications.
 
 This approach makes it easy to:
+
  - Vary multiple parameters at once across a set of runs,
  - Ensure each run’s configuration is reproducible and stored in Git,
  - Keep experiments organised and traceable, with each branch representing a single perturbation case.
