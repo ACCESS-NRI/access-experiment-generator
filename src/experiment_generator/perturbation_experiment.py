@@ -268,8 +268,8 @@ class PerturbationExperiment(BaseExperiment):
                     else:
                         if len(value) != total_exps:
                             raise ValueError(
-                                f"For key '{key}', the inner list length {len(value)}, but the "
-                                f"total experiment {total_exps}"
+                                f"For key '{key}', the inner list length is {len(value)}, but the "
+                                f"total experiment count is {total_exps}"
                             )
                         result[key] = _list_select_and_clean(value[indx])
             # Scalar, string, etc so return as is
