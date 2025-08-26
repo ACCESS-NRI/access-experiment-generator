@@ -9,8 +9,8 @@ from .config_updater import ConfigUpdater
 from .nuopc_runconfig_updater import NuopcRunConfigUpdater
 from .mom6_input_updater import Mom6InputUpdater
 from .nuopc_runseq_updater import NuopcRunseqUpdater
-
-BRANCH_KEY = "branches"
+from .om2_forcing_updater import Om2ForcingUpdater
+from .common_var import REMOVED, BRANCH_KEY
 
 
 @dataclass
@@ -49,6 +49,7 @@ class PerturbationExperiment(BaseExperiment):
         self.nuopcrunconfigupdater = NuopcRunConfigUpdater(directory)
         self.mom6inputupdater = Mom6InputUpdater(directory)
         self.nuopcrunsequpdater = NuopcRunseqUpdater(directory)
+        self.om2forcingupdater = Om2ForcingUpdater(directory)
 
     def _apply_updates(self, file_params: dict[str, dict]) -> None:
         """
@@ -65,6 +66,8 @@ class PerturbationExperiment(BaseExperiment):
                 self.mom6inputupdater.update_mom6_params(params, filename)
             elif filename == "nuopc.runseq":
                 self.nuopcrunsequpdater.update_nuopc_runseq(params, filename)
+            elif filename == "atmosphere/forcing.json":
+                self.om2forcingupdater.update_forcing_params(params, filename)
 
     def manage_control_expt(self) -> None:
         """
@@ -179,7 +182,10 @@ class PerturbationExperiment(BaseExperiment):
         Recursively extract parameters for a specific run index from nested structures.
         It handles (nested) dicts, plain lists, lists of lists, and lists of dicts,
         also handles broadcasting, filtering, and index-based selection.
-
+        Args:
+            nested_dict (dict): The nested dictionary containing parameters.
+            indx (int): The index of the current expt run.
+            total_exps (int): Total number of experiments.
 
         Rules:
          - (nested) dict: recursively extract for each key.
@@ -214,7 +220,6 @@ class PerturbationExperiment(BaseExperiment):
             ```
             For the 2nd branch, `load` is filtered to empty, so the `load` key is removed.
         """
-        REMOVED = {None, "REMOVE"}
 
         def _filter_list(lst: list) -> list:
             """Filter out None or 'REMOVE' values from a list."""
@@ -259,15 +264,14 @@ class PerturbationExperiment(BaseExperiment):
                 else:
                     # Plain list: if it has one element or all elements are identical, broadcast that element.
                     if len(value) == 1 or (len(value) > 1 and all(i == value[0] for i in value)):
-                        result[key] = value[0]
-                        return result
-
-                    if len(value) != total_exps:
-                        raise ValueError(
-                            f"For key '{key}', the inner list length {len(value)}, but the "
-                            f"total experiment {total_exps}"
-                        )
-                    result[key] = _list_select_and_clean(value[indx])
+                        result[key] = _list_select_and_clean(value[0])
+                    else:
+                        if len(value) != total_exps:
+                            raise ValueError(
+                                f"For key '{key}', the inner list length is {len(value)}, but the "
+                                f"total experiment count is {total_exps}"
+                            )
+                        result[key] = _list_select_and_clean(value[indx])
             # Scalar, string, etc so return as is
             else:
                 result[key] = value

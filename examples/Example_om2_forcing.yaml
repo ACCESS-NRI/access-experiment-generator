@@ -1,0 +1,90 @@
+# Experiment Configuration File
+
+
+model_type: access-om2 # Specify the model ("access-om2", "access-om3", "access-esm1.5", or "access-esm1.6")
+repository_url: git@github.com:ACCESS-NRI/access-om2-configs.git
+start_point: "6b315e4" # Control commit hash for new branches
+test_path: prototype-0.2.0-om2-forcing # All control and perturbation experiment repositories will be created here; can be relative, absolute or ~ (user-defined)
+repository_directory: MC_25km_jra_ryf # Local directory name for the central repository (user-defined)
+
+control_branch_name: ctrl
+
+Control_Experiment:
+
+
+# - Each item under `perturbations` is a row, describing a single perturbation definition applied across branches.
+#   - Each element corresponds to a branch in order: first -> perturb_1, second -> perturb_2, etc.
+# Broadcasting:
+# - If only one element is provided in a row, it is broadcast to all branches:
+#     value:
+#       - INPUT/uas_Tropical_Pacific_Perturbation.nc
+#   -> All branches use this same file.
+# Skipping:
+# - Use `~`, `None`, or `REMOVE` to skip a branch in that row:
+#     value:
+#       - 5    # for perturb_1
+#       - ~    # no value for perturb_2
+#
+# YAML block style (nested lists):
+# - Some keys need multiple entries per branch (e.g., `dimension` combining spatial + temporal).
+#   You can use block-style nested lists for clarity:
+#     dimension:
+#       - - "temporal"
+#         - "spatial"   # for perturb_1
+#       - ~              # perturb_2 not used
+# Another example with both branches:
+#     dimension:
+#       - - "temporal"
+#         - "spatial"   # perturb_1 uses ["temporal", "spatial"] for type="separable"
+#       - "temporal"   # perturb_2 uses temporal only
+Perturbation_Experiment:
+  Parameter_block1:
+    branches:
+      - perturb_1
+      - perturb_2
+    atmosphere/forcing.json:
+      uas:
+        perturbations:
+          - type:
+              - scaling
+              - offset
+            dimension:
+              - spatial
+            value:
+              - INPUT/uas_Tropical_Pacific_Perturbation.nc
+            calendar:
+              - forcing
+            comment:
+              - Time-independent increase in tropical Pacific zonal winds
+          - type:
+              - offset
+              - ~
+            dimension:
+              - constant
+              - ~
+            value:
+              - 5
+              - ~
+            calendar:
+              - forcing
+              - ~
+            comment:
+              - ""
+              - ~
+          - type:
+              - separable
+              - ~
+            dimension:
+              - - "temporal"
+                - "spatial"
+              - ~
+            value:
+              - - "test_data/temporal.RYF.rsds.1990_1991.nc"
+                - "test_data/spatial.RYF.rsds.1990_1991.nc"
+              - ~
+            calendar:
+              - forcing
+              - ~
+            comment:
+              - ""
+              - ~

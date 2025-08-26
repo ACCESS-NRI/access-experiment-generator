@@ -1,0 +1,3 @@
+ignore:
+  # https://docs.codecov.com/docs/ignoring-paths
+  - "src/experiment_generator/tmp_parser/**/*"
