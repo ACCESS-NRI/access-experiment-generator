@@ -34,9 +34,9 @@ Control_Experiment:
 #       - ~              # perturb_2 not used
 # Another example with both branches:
 #     dimension:
-#       - - "spatial"
-#         - "temporal"   # perturb_1 uses spatial+temporal
-#       - - "temporal"   # perturb_2 uses temporal only
+#       - - "temporal"
+#         - "spatial"   # perturb_1 uses ["temporal", "spatial"] for type="separable"
+#       - "temporal"   # perturb_2 uses temporal only
 Perturbation_Experiment:
   Parameter_block1:
     branches:
@@ -75,8 +75,8 @@ Perturbation_Experiment:
               - separable
               - ~
             dimension:
-              - - "spatial"
-                - "temporal"
+              - - "temporal"
+                - "spatial"
               - ~
             value:
               - - "test_data/temporal.RYF.rsds.1990_1991.nc"

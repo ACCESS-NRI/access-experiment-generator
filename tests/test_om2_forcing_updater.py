@@ -81,7 +81,7 @@ def test_update_forcing_params_correct_path(tmp_repo_dir, patch_json_and_utils):
             "perturbations": [
                 {
                     "type": "offset",
-                    "dimension": ["spatial", "temporal"],
+                    "dimension": ["temporal", "spatial"],
                     "value": ["../test_data/temporal.uas.1990_1991.nc", "../test_data/spatial.uas.1990_1991.nc"],
                     "calendar": "experiment",
                     "comment": "bias adjust",
@@ -164,7 +164,7 @@ def test_some_removed_but_others_cleaned_and_kept(tmp_repo_dir, patch_json_and_u
     perts = updates["perturbations"]
     assert isinstance(perts, list) and len(perts) == 1
     assert perts[0]["type"] == "separable"
-    assert perts[0]["dimension"] in (["temporal", "spatial"], ["spatial", "temporal"])
+    assert perts[0]["dimension"] == ["temporal", "spatial"]
 
     assert len(patch_json_and_utils["write_json"]) == 1
     written_json, _ = patch_json_and_utils["write_json"][0]
@@ -249,7 +249,7 @@ def test_validate_single_perturbation_wrong_type(tmp_repo_dir, ptype):
         123,
         "space",  # not allowed
         ["temporal"],  # list but not the two-item allowed perms
-        ["spatial", "temporal", "x"],  # extra item
+        ["temporal", "spatial", "x"],  # extra item
     ],
 )
 def test_validate_single_perturbation_invalid_dimension(tmp_repo_dir, dim):
