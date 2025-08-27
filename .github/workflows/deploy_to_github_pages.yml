@@ -19,7 +19,7 @@ env:
   DOC_DIR: documentation
   ROOT_BUILD_DIR: ${{ github.workspace }}/website
   COMMENT_LABEL: pr-preview
-  ROOT_DOMAIN: https://access-nri.github.io
+  ROOT_DOMAIN: https://access-experiment-generator.access-hive.org.au
 
 jobs:
   set-root-url:
