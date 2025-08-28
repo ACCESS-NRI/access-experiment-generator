@@ -32,7 +32,6 @@ You can nest dictionaries and lists arbitrarily. For example, you might have a d
 ### Some examples
 
  - Dict contains a list
-
 ```yaml
 outer:
   constant: 42
