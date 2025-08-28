@@ -7,7 +7,7 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 
-# About
+## About
 The **ACCESS Experiment Generator** is a tool for creating **ensembles of model experiments** from a single control configuration. Instead of manually editing multiple files, you describe changes in one YAML plan, and the generator:
 
 - Clones the configuration repository from GitHub.  
@@ -22,6 +22,9 @@ Each generated branch is immediately `Payu`-ready — you can step into the bran
 - **Git-branch workflow**: each variant is a branch, making experiments traceable.  
 - **Reproducibility**: given the same repo + YAML, identical branches are regenerated.  
 - **Payu integration**: generated branches are ready to run on [Payu](https://github.com/payu-org/payu).
+
+## Documentation
+Full documentation is available at https://access-experiment-generator.access-hive.org.au/
 
 ## Installation
 ### User setup
@@ -143,6 +146,3 @@ git branch
 git checkout perturb_1
 git diff ctrl -- ice/cice_in.nml
 ```
-
-## Documentation
-Full documentation is available at https://access-experiment-generator.access-hive.org.au/
