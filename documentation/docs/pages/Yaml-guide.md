@@ -87,7 +87,7 @@ Some rules to note:
 
  - If you provide a single value instead of a list, that value is taken to apply to all experiments (broadcasted).
  - All lists should either have length equal to the number of experiments or be of length 1 (or all elements identical) to be broadcast. If a list length doesn't match and isn't broadcastable, the tool will raise an error to alert you (for example, two values given for three experiments).
- - Special placeholder values like `~` or `REMOVE` can be used in lists to indicate that a key should be removed for that experiment (useful for optional settings)
+ - Special placeholder values like `~` or `REMOVE` can be used in lists to indicate that a key should be removed for that experiment (useful for optional settings) - one YAML example can be found at [examples/Example_remove_parameters.yaml](https://github.com/ACCESS-NRI/access-experiment-generator/blob/main/examples/Example_remove_parameters.yaml).
 - The Perturbation Cookbook (next section) provides more detailed guidance on YAML format and how values are selected per experiment.
 
 After running the generator with the completed YAML, you will end up with the `ctrl` branch and two perturbation branches. Each perturbation branch (`perturb_1`, `perturb_2`) will contain the same changes that `ctrl` had (since they branch off `ctrl`), plus the specific parameter modifications for that experiment. Each branch will have a commit like `"Updated perturbation files: [...]"` listing the files changed for that case. You can then push these branches to your remote repository or use them for running experiments via `Payu`.
