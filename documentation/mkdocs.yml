@@ -107,9 +107,11 @@ markdown_extensions:
 
 # Navigation
 nav:
-  - Home:                  index.md
+  - Home:                  pages/index.md
+  - Getting Started:       pages/Getting-started.md
+  - YAML Guide:            pages/Yaml-guide.md
   - Perturbation Cookbook: pages/Perturbation-cookbook.md
-  - Repository Structure:  pages/Repository-Structure.md
+  # - Repository Structure:  pages/Repository-Structure.md # hide this page for now
 
 # Footer
 extra:
