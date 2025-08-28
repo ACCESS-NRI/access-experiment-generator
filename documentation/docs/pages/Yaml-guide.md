@@ -10,7 +10,7 @@ Your experiment plan is a YAML file. This section explains how to write it corre
 | `model_type`          | `access-om2`                                         | Model/config type, can be either `access-om2`, `access-om3`, `access-esm1.5` or `access-esm1.6`.                   |
 | `repository_url`      | `git@github.com:ACCESS-NRI/access-om2-configs.git`   | Git repo to clone for the control experiment.                   |
 | `start_point`         | `fce24e3`                                            | Commit/branch to start from         |
-| `test_path`           | `~/experiments/run1`                                 | Workspace directory                 |
+| `test_path`           | `prototype-0.1.0`                                 | Workspace directory                 |
 | `repository_directory`| `1deg_jra55_ryf`                                     | Subdir containing configs           |
 | `control_branch_name` | `ctrl`                                               | Control branch name             |
 | `Control_Experiment`  |           | Edits to apply to control branch    |
