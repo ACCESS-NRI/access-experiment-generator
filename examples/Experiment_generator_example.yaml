@@ -11,47 +11,47 @@ repository_directory: 1deg_jra55_ryf # Local directory name for the central repo
 control_branch_name: ctrl
 
 Control_Experiment:
-    accessom2.nml:
-        date_manager_nml:
-            restart_period: "0,0,86400"
+  accessom2.nml:
+    date_manager_nml:
+      restart_period: "0,0,86400"
 
-    config.yaml:
-        queue: express
-        walltime: 5:00:00
+  config.yaml:
+    queue: express
+    walltime: 5:00:00
 
-    ice/cice_in.nml:
-        shortwave_nml:
-            albicei: 0.05
-            albicev: 0.08
-        thermo_nml:
-            chio: 0.001
+  ice/cice_in.nml:
+    shortwave_nml:
+      albicei: 0.05
+      albicev: 0.08
+    thermo_nml:
+      chio: 0.001
 
 Perturbation_Experiment:
-    Parameter_block1:
-        branches:
-            - perturb_1
-            - perturb_2
+  Parameter_block1:
+    branches:
+      - perturb_1
+      - perturb_2
 
-        ice/cice_in.nml:
-            shortwave_nml:
-                albicei:
-                    - 0.06
-                    - 0.07
-                albicev:
-                    - 0.78
-                    - 0.81
-            thermo_nml:
-                chio:
-                    - 0.007
-                    - 0.008
+    ice/cice_in.nml:
+      shortwave_nml:
+        albicei:
+          - 0.06
+          - 0.07
+        albicev:
+          - 0.78
+          - 0.81
+      thermo_nml:
+        chio:
+          - 0.007
+          - 0.008
 
-        ocean/input.nml:
-            ocean_nphysics_util_nml:
-                agm_closure_length:
-                    - 25000.0
-                    - 75000.0
+    ocean/input.nml:
+      ocean_nphysics_util_nml:
+        agm_closure_length:
+          - 25000.0
+          - 75000.0
 
-    # Parameter_block2:
-        # branches:
-        #     - test-nml1
-        #     - test-nml2
+#   Parameter_block2:
+#     branches:
+#       - test-nml1
+#       - test-nml2
