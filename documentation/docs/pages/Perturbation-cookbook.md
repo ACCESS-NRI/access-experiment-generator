@@ -27,7 +27,7 @@ In the first, `fruits` is a list of three strings. In the second, `settings` is 
 
 ### Nested structures
 
-You can nest dictionaries and lists arbitrarily. For example, you might have a dictionary that contains a list, or a list of dictionaries. Ensure the nesting in your YAML experiment plan matches the nesting of parameters in the model config files. For example, if a namelist parameter resides within a group, represent it as a nested dict under that group key (as we did with `date_manager_nml` in [YAML Guide](pages/Yaml-guide.md)). If a configuration file has a list of items (like a list of modules to load), you might represent it as a list in YAML.
+You can nest dictionaries and lists arbitrarily. For example, you might have a dictionary that contains a list, or a list of dictionaries. Ensure the nesting in your YAML experiment plan matches the nesting of parameters in the model config files. For example, if a namelist parameter resides within a group, represent it as a nested dict under that group key (as we did with `date_manager_nml` in [YAML Guide](./Yaml-guide.md)). If a configuration file has a list of items (like a list of modules to load), you might represent it as a list in YAML.
 
 ### Some examples
  - Dict contains a list
