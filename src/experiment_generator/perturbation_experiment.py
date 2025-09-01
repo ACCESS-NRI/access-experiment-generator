@@ -11,6 +11,7 @@ from .mom6_input_updater import Mom6InputUpdater
 from .nuopc_runseq_updater import NuopcRunseqUpdater
 from .om2_forcing_updater import Om2ForcingUpdater
 from .common_var import REMOVED, BRANCH_KEY
+from collections.abc import Mapping, Sequence, Hashable
 
 
 @dataclass
@@ -58,7 +59,7 @@ class PerturbationExperiment(BaseExperiment):
         for filename, params in file_params.items():
             if filename.endswith("_in") or filename.endswith(".nml"):
                 self.f90namelistupdater.update_nml_params(params, filename)
-            elif filename == "config.yaml":
+            elif filename.endswith(".yaml"):
                 self.configupdater.update_config_params(params, filename)
             elif filename == "nuopc.runconfig":
                 self.nuopcrunconfigupdater.update_runconfig_params(params, filename)
@@ -221,9 +222,56 @@ class PerturbationExperiment(BaseExperiment):
             For the 2nd branch, `load` is filtered to empty, so the `load` key is removed.
         """
 
+        class _Drop:
+            # just a marker for removing unwanted keys
+            pass
+
+        _drop = _Drop()
+
+        def _filter_value(x):
+            if isinstance(x, Mapping):
+                res = type(x)()  # preserves types suchas CommentedMap, etc
+                for k, v in x.items():
+                    filtered_v = _filter_value(v)
+                    if filtered_v is _drop:
+                        # remove this key
+                        continue
+                    if isinstance(filtered_v, Sequence) and not isinstance(filtered_v, str) and len(filtered_v) == 0:
+                        # remove this key if the filtered value is an empty list
+                        continue
+                    # keep this key
+                    res[k] = filtered_v
+
+                if not res:
+                    # if the dict is empty after filtering, drop it
+                    return _drop
+                return res
+
+            if isinstance(x, Sequence) and not isinstance(x, str):
+                # filter each element, preserve type
+                elements = []
+                for v in x:
+                    filtered_v = _filter_value(v)
+                    if filtered_v is _drop:
+                        # remove this element
+                        continue
+                    if isinstance(filtered_v, Sequence) and not isinstance(filtered_v, str) and len(filtered_v) == 0:
+                        # remove this element if it's an empty list
+                        continue
+                    # keep this element
+                    elements.append(filtered_v)
+                return elements
+
+            if isinstance(x, Hashable) and x in REMOVED:
+                return _drop
+            return x
+
         def _filter_list(lst: list) -> list:
-            """Filter out None or 'REMOVE' values from a list."""
-            return [x for x in lst if x not in REMOVED]
+            """
+            Recursively remove None or 'REMOVE' values from lists/dicts.
+            """
+            res = _filter_value(lst)
+            return list(res) if isinstance(res, Sequence) and not isinstance(res, str) else [res]
 
         def _list_select_and_clean(row: list | str | None) -> list | str | None:
             if isinstance(row, list):
