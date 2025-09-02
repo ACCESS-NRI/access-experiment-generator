@@ -11,6 +11,7 @@ from .mom6_input_updater import Mom6InputUpdater
 from .nuopc_runseq_updater import NuopcRunseqUpdater
 from .om2_forcing_updater import Om2ForcingUpdater
 from .common_var import REMOVED, BRANCH_KEY
+from collections.abc import Mapping, Sequence, Hashable
 
 
 @dataclass
@@ -58,7 +59,7 @@ class PerturbationExperiment(BaseExperiment):
         for filename, params in file_params.items():
             if filename.endswith("_in") or filename.endswith(".nml"):
                 self.f90namelistupdater.update_nml_params(params, filename)
-            elif filename == "config.yaml":
+            elif filename.endswith(".yaml"):
                 self.configupdater.update_config_params(params, filename)
             elif filename == "nuopc.runconfig":
                 self.nuopcrunconfigupdater.update_runconfig_params(params, filename)
@@ -221,9 +222,63 @@ class PerturbationExperiment(BaseExperiment):
             For the 2nd branch, `load` is filtered to empty, so the `load` key is removed.
         """
 
+        class _Drop:
+            # just a marker for removing unwanted keys
+            pass
+
+        _drop = _Drop()
+
+        def _is_seq(x) -> bool:
+            return isinstance(x, Sequence) and not isinstance(x, str)
+
+        def _filter_value(x):
+            """
+            Recursively apply removal rules to any shape; return cleaned_value or _drop marker.
+            """
+            # Mapping (dict, CommentedMap, etc)
+            if isinstance(x, Mapping):
+                res = type(x)()  # preserves types suchas CommentedMap, etc
+                for k, v in x.items():
+                    filtered_v = _filter_value(v)
+                    if filtered_v is _drop:
+                        # remove this key
+                        continue
+                    if _is_seq(filtered_v) and len(filtered_v) == 0:
+                        # remove this key if the filtered value is an empty list
+                        continue
+                    # keep this key
+                    res[k] = filtered_v
+
+                if not res:
+                    # if the dict is empty after filtering, drop it
+                    return _drop
+                return res
+            # Sequence (list, tuple, etc) but not str; clean each element; drop elements that are _drop or empty lists
+            if _is_seq(x):
+                # filter each element, preserve type
+                elements = []
+                for v in x:
+                    filtered_v = _filter_value(v)
+                    if filtered_v is _drop:
+                        # remove this element
+                        continue
+                    if _is_seq(filtered_v) and len(filtered_v) == 0:
+                        # remove this element if it's an empty list
+                        continue
+                    # keep this element
+                    elements.append(filtered_v)
+                return elements
+            # Scalar, str, None, etc
+            if isinstance(x, Hashable) and x in REMOVED:
+                return _drop
+            return x
+
         def _filter_list(lst: list) -> list:
-            """Filter out None or 'REMOVE' values from a list."""
-            return [x for x in lst if x not in REMOVED]
+            """
+            Recursively remove None or 'REMOVE' values from lists/dicts.
+            """
+            res = _filter_value(lst)
+            return list(res) if _is_seq(res) else [res]
 
         def _list_select_and_clean(row: list | str | None) -> list | str | None:
             if isinstance(row, list):
@@ -236,19 +291,19 @@ class PerturbationExperiment(BaseExperiment):
 
         result = {}
         for key, value in nested_dict.items():
-            # nested dictionary
+            # nested dictionary (Mapping)
             if isinstance(value, dict):
-                result[key] = self._extract_run_specific_params(value, indx, total_exps)
-            # list or list of lists
+                tmp = self._extract_run_specific_params(value, indx, total_exps)
+                cleaned = _filter_value(tmp)
+                if cleaned is not _drop:
+                    result[key] = cleaned
+            # list or list of lists (Sequence)
             elif isinstance(value, list):
                 # if it's a list of dicts (e.g., for submodels in `config.yaml` in OM2)
                 if value and all(isinstance(i, dict) for i in value):
                     # process each dict in the list for the given column indx
                     tmp = [self._extract_run_specific_params(i, indx, total_exps) for i in value]
-                    if all(i == tmp[0] for i in tmp):
-                        result[key] = tmp[0]
-                    else:
-                        result[key] = tmp
+                    result[key] = tmp[0] if all(x == tmp[0] for x in tmp) else tmp
 
                 # if it's a list of lists
                 elif value and all(isinstance(i, list) for i in value):

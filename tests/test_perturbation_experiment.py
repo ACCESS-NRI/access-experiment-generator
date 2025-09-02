@@ -278,3 +278,26 @@ def test_setup_branch_is_new_branch_true(tmp_repo_dir, indata, patch_git, checko
     assert call["branch_name"] == "perturb_1"
     assert call["is_new_branch"] is True
     assert call["start_point"] == indata["control_branch_name"]
+
+
+def test_mapping_drops_key_when_child_cleans_to_empty_list(tmp_repo_dir, indata):
+    expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
+    param_dict = {
+        "outer": {
+            "lst": [
+                {"inner1": ["REMOVE", "REMOVE"]},
+                {"inner2": ["REMOVE", "REMOVE"]},
+            ]
+        }
+    }
+    # NB: total_exps can be anything > 1, since outer list len is 1 so it gets broadcast
+    res = expt._extract_run_specific_params(param_dict, indx=0, total_exps=3)
+    assert res == {}
+
+
+def test_sequence_drops_element_when_item_becomes_empty_list(tmp_repo_dir, indata):
+    expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
+    param_dict = {"outer": [[["REMOVE"], "A"]]}
+    # NB: total_exps can be anything > 1, since outer list len is 1 so it gets broadcast
+    res = expt._extract_run_specific_params(param_dict, indx=0, total_exps=3)
+    assert res == {"outer": ["A"]}
