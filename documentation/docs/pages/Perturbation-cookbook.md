@@ -81,7 +81,8 @@ This means every experiment gets `a=10` and `flag="on"`. If you truly need a dif
     - If the outer list has length 1, it assumes you meant "use this single inner list for all experiments" (broadcast the one list to all).
     - If the outer list length equals the number of experiments, it will pick the inner list at the index for each experiment.
     - Any other length will be an error (similar to the scalar list rule).
- - **2.6 Filtering and removal rules:** The generator applies automatic filtering rules to clean up lists and dictionaries. This prevents placeholders or "removed" markers from leaking into the final configurations.
+
+  - **2.6 Filtering and removal rules:** The generator applies automatic filtering rules to clean up lists and dictionaries. This prevents placeholders or "removed" markers from leaking into the final configurations.
 
     - Removal markers: Any of `REMOVE`, `~` and `null`.
     - Empty lists or dicts: If a list or dict ends up empty after filtering, it is also discarded.
