@@ -1,9 +1,8 @@
 """
 Utility module
 
-This module provides helper functions,
-
-- `update_config_entries`: Recursively apply updates or removals to nested dictionaries.
+This module provides helper functions
+`update_config_entries`: Recursively apply updates or removals to nested dictionaries.
 """
 
 
