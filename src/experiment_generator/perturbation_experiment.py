@@ -291,7 +291,6 @@ class PerturbationExperiment(BaseExperiment):
 
         result = {}
         for key, value in nested_dict.items():
-            print(key, value)
             # nested dictionary (Mapping)
             if isinstance(value, dict):
                 tmp = self._extract_run_specific_params(value, indx, total_exps)
