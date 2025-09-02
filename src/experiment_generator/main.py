@@ -1,7 +1,7 @@
 import argparse
 import os
 
-from .utils import read_yaml
+from .tmp_parser.yaml_config import read_yaml
 from .experiment_generator import ExperimentGenerator
 
 
