@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 from experiment_generator.config_updater import ConfigUpdater
-from experiment_generator.utils import read_yaml
+from experiment_generator.tmp_parser.yaml_config import read_yaml
 
 
 def test_update_config_params_update_params_and_jobname_warning(tmp_path, capsys):

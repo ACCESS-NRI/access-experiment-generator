@@ -38,20 +38,22 @@ def write_mom_input(
     lines: list[str],
     params: dict[str, Any],
     out_path: str,
-    comm_width: int = 31,
-    pop_key: bool = True,  # expose the flag used internally
+    remove_missing: bool = True,
 ) -> None:
     """
-    Rewrite `lines` using updated `params`, writing to `out_path`.
+    Updating MOM_input lines, preserving original format.
 
-    • Keys still present in `params` are rewritten with new values.
-    • Keys missing from `params` are removed (plus any immediate comment block).
-    • New keys in `params` are appended at the end under a banner.
+    - Existing keys present in `params` are updated.
+      - Only the RHS is changed, comments and spacing are preserved.
+      - If the RHS text is identical, the line is unchanged.
+    - Existing keys absent from `params` are removed if `remove_missing` is True.
+      - The assignment line is removed.
+      - Any immediately following comment lines are also removed.
+    - New keys in `params` that were not in the original file are appended at the end.
     """
-    comm_col = comm_width + 1
     out: list[str] = []
     skip_comment_block = False
-    align_comment = False
+    seen_keys: set[str] = set()
 
     for ln in lines:
         stripped = ln.strip()
@@ -64,21 +66,29 @@ def write_mom_input(
         # assignment
         m = _REG_PATTERN.match(ln)
         if m:
-            indent, name, _, comment = m.groups()
+            indent, name, rhs, comment = m.groups()
+            seen_keys.add(name)
 
-            # remove tags
-            if name not in params:
+            # remove keys not in params
+            if remove_missing and name not in params:
                 skip_comment_block = True
-                align_comment = False
+                continue
+
+            # If we don't have an override for this key, keep original line
+            if name not in params:
+                out.append(ln)
                 continue
 
             # keep and rewrite
             new_rhs = _format_conversion(params[name])
-            lhs = f"{indent}{name} = {new_rhs}"
-            if comment:
-                lhs = lhs.ljust(comm_width) + " !   " + comment.lstrip("! ").rstrip("\n")
-            out.append(lhs + "\n")
-            align_comment = True
+            # If rhs unchanged, keep exact line
+            if rhs.strip() == new_rhs:
+                out.append(ln)
+                continue
+
+            # keep everything except rhs
+            rhs_left, rhs_right = m.span(3)
+            out.append(ln[:rhs_left] + new_rhs + ln[rhs_right:])
             continue
 
         # section/tag line
@@ -86,21 +96,16 @@ def write_mom_input(
             out.append(ln)
             continue
 
-        # pure-comment after a rewrite hence align it
-        if align_comment and stripped.startswith("!"):
-            out.append(" " * comm_col + "!   " + ln.lstrip("! ").rstrip("\n") + "\n")
-            continue
-
-        align_comment = False
         out.append(ln)
 
     # append new parameters that never existed in the file
-    existing_keys = {m.group(2) for m in map(_REG_PATTERN.match, lines) if m}
-    to_add = [k for k in params if k not in existing_keys]
+    to_add = [k for k in params.keys() if k not in seen_keys]
     if to_add:
+        if out and not out[-1].endswith("\n"):
+            out[-1] += "\n"
         out.append("\n! --- Added parameters ---\n")
         for k in to_add:
             v = _format_conversion(params[k])
-            out.append(f"{k} = {v}".ljust(comm_width) + "\n")
+            out.append(f"{k} = {v}\n")
 
     Path(out_path).write_text("".join(out))

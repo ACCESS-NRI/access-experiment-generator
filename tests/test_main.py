@@ -1,7 +1,7 @@
 import sys
 import experiment_generator.experiment_generator as exp_gen
 from experiment_generator.experiment_generator import VALID_MODELS
-from experiment_generator import utils
+from experiment_generator.tmp_parser import yaml_config
 import pytest
 import runpy
 
@@ -107,7 +107,7 @@ def test_exec_main(tmp_path, monkeypatch):
         def run(self):
             called["run"] = True
 
-    monkeypatch.setattr(utils, "read_yaml", dummy_read_yaml, raising=True)
+    monkeypatch.setattr(yaml_config, "read_yaml", dummy_read_yaml, raising=True)
     monkeypatch.setattr(exp_gen, "ExperimentGenerator", DummyEG, raising=True)
 
     monkeypatch.setattr(sys, "argv", ["prog", "-i", "dummy.yaml"])

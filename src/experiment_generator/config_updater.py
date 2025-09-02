@@ -7,7 +7,8 @@ It includes methods for modifying parameters in both control and perturbation ex
 
 import warnings
 from pathlib import Path
-from .utils import read_yaml, write_yaml, update_config_entries
+from .utils import update_config_entries
+from .tmp_parser.yaml_config import read_yaml, write_yaml
 
 
 class ConfigUpdater:
