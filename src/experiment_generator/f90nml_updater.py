@@ -10,6 +10,7 @@ It supports parameter additions, updates, deletions, and specific logic
 from pathlib import Path
 import numpy as np
 import f90nml
+import re
 
 
 class F90NamelistUpdater:
@@ -114,7 +115,8 @@ def format_nml_params(nml_path: str, param_dict: dict) -> None:
             for idx, line in enumerate(fileread):
                 if line.lstrip().startswith("!"):
                     continue
-                if tmp_param in line:
+                words = [w for w in re.split(r"[^a-zA-Z0-9_]+", line) if w]
+                if tmp_param in words:
                     fileread[idx] = f"    {tmp_param} = {tmp_values}\n"
                     break
 
