@@ -127,3 +127,18 @@ def test_format_nml_params_skips_comment_lines(tmp_path):
     assert lines[1].startswith("! flag")
     # assignment line updated
     assert "flag = .true." in lines[2]
+
+
+def test_format_nml_params_exact_varname_match(tmp_path):
+    nml_file = tmp_path / "test.nml"
+    nml_file.write_text("&dummy\n" "    ! days = 99\n" "    days = 30\n" "    days_to_increment = 5\n" "/\n")
+
+    format_nml_params(
+        nml_file.as_posix(),
+        {"dummy": {"days": 31}},
+    )
+
+    lines = nml_file.read_text().splitlines()
+    assert lines[1].strip() == "! days = 99"
+    assert lines[2].strip() == "days = 31"
+    assert lines[3].strip() == "days_to_increment = 5"
