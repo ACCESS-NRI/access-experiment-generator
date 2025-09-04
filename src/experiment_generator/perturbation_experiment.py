@@ -12,6 +12,7 @@ from .nuopc_runseq_updater import NuopcRunseqUpdater
 from .om2_forcing_updater import Om2ForcingUpdater
 from .common_var import REMOVED, BRANCH_KEY
 from collections.abc import Mapping, Sequence, Hashable
+import os
 
 
 @dataclass
@@ -57,7 +58,7 @@ class PerturbationExperiment(BaseExperiment):
         Apply a dict of `{filename: parameters}` to different config files.
         """
         for filename, params in file_params.items():
-            if filename.endswith("_in") or filename.endswith(".nml"):
+            if filename.endswith("_in") or filename.endswith(".nml") or os.path.basename(filename) == "namelists":
                 self.f90namelistupdater.update_nml_params(params, filename)
             elif filename.endswith(".yaml"):
                 self.configupdater.update_config_params(params, filename)
