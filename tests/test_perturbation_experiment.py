@@ -220,7 +220,7 @@ def test_manage_perturb_expt_creat_branches_applies_updates_and_commits(
         ({"modules": [["A"], ["B"]]}, 1, 2, {"modules": ["B"]}),
         # select None should return None (row in REMOVED)
         ({"modules": ["A", "REMOVE"]}, 0, 2, {"modules": "A"}),
-        ({"modules": ["A", "REMOVE"]}, 1, 2, {"modules": None}),
+        ({"modules": ["A", "REMOVE"]}, 1, 2, {}),
         # scalar - broadcast across branches
         ({"cpl_dt": 3600}, 0, 2, {"cpl_dt": 3600}),
         ({"cpl_dt": 3600}, 1, 2, {"cpl_dt": 3600}),
@@ -301,3 +301,12 @@ def test_sequence_drops_element_when_item_becomes_empty_list(tmp_repo_dir, indat
     # NB: total_exps can be anything > 1, since outer list len is 1 so it gets broadcast
     res = expt._extract_run_specific_params(param_dict, indx=0, total_exps=3)
     assert res == {"outer": ["A"]}
+
+
+def test_mapping_value_is_remove_preserved_as_string(tmp_repo_dir, indata):
+    # mapping value is the literal 'REMOVE' -> _is_removed_str(x) returns x
+    expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
+    param_dict = {"outer": {"v": "REMOVE"}}
+    # Expect 'REMOVE' to be preserved as a value (not dropped) by _filter_value
+    res = expt._extract_run_specific_params(param_dict, indx=0, total_exps=2)
+    assert res == {"outer": {"v": "REMOVE"}}
