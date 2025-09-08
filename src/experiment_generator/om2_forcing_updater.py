@@ -4,6 +4,9 @@ from .utils import update_config_entries
 import warnings
 from .common_var import REMOVED
 
+required = ["type", "dimension", "value", "calendar", "comment"]
+allowed_types = {"scaling", "offset", "separable"}
+
 
 class Om2ForcingUpdater:
     """
@@ -73,14 +76,18 @@ class Om2ForcingUpdater:
         else:
             raise TypeError(f"-- forcing.json '{fieldname}': 'perturbations' must be a dict or list of dicts")
 
-        required = ["type", "dimension", "value", "calendar", "comment"]
-
         def _is_to_remove(pert: dict) -> bool:
-            if all(pert.get(k) in REMOVED for k in required):
+            # explicit delete marker on type
+            t_ = pert.get("type", None)
+            if isinstance(t_, str) and t_ == REMOVED:
                 return True
-            if pert.get("type") in REMOVED:
+
+            # missing/invalid type
+            if t_ is None or not isinstance(t_, str) or t_ not in allowed_types:
                 return True
-            return False
+
+            # all required keys are marked for removal
+            return all(isinstance(pert.get(k), str) and pert.get(k) == REMOVED for k in required)
 
         cleaned = [p for p in perts if not _is_to_remove(p)]
         if not cleaned:
@@ -105,7 +112,7 @@ class Om2ForcingUpdater:
         """
         Validate a single perturbation dict.
         """
-        if pert["type"] not in {"scaling", "offset", "separable"}:
+        if pert["type"] not in allowed_types:
             raise ValueError(f"Invalid perturbation type: {pert['type']}")
 
         dim = pert["dimension"]

@@ -106,7 +106,7 @@ def test_all_removed_perturbations_warn_and_skip(tmp_repo_dir, patch_json_and_ut
     warn and do NOT set updates['perturbations'] (early return).
     """
     # Make "REMOVE"
-    monkeypatch.setattr(om2_forcing_module, "REMOVED", {"REMOVE"}, raising=True)
+    monkeypatch.setattr(om2_forcing_module, "REMOVED", "REMOVE", raising=True)
 
     updater = Om2ForcingUpdater(tmp_repo_dir)
     params = {
@@ -135,7 +135,7 @@ def test_some_removed_but_others_cleaned_and_kept(tmp_repo_dir, patch_json_and_u
     Cleaning branch where some items are removed and the remaining
     cleaned list is validated and assigned back into updates.
     """
-    monkeypatch.setattr(om2_forcing_module, "REMOVED", {"REMOVE"}, raising=True)
+    monkeypatch.setattr(om2_forcing_module, "REMOVED", "REMOVE", raising=True)
 
     updater = Om2ForcingUpdater(tmp_repo_dir)
     params = {
@@ -277,3 +277,37 @@ def test_validate_single_perturbation_wrong_calendar(tmp_repo_dir, calendar):
     }
     with pytest.raises(ValueError):
         updater._validate_single_perturbation(pert)
+
+
+@pytest.mark.parametrize(
+    "wrong_type",
+    [
+        None,
+        42,
+        "nonsense",
+    ],
+)
+def test_invalid_type_branch_removes_perturbations(tmp_repo_dir, patch_json_and_utils, wrong_type):
+    updater = Om2ForcingUpdater(tmp_repo_dir)
+    params = {
+        "tas": {
+            "filename": "NEW/tas.nc",
+            "cname": "tair_ai",
+            "perturbations": [
+                {
+                    "type": wrong_type,
+                    "dimension": "temporal",
+                    "value": "../bad.nc",
+                    "calendar": "forcing",
+                    "comment": "invalid type",
+                }
+            ],
+        }
+    }
+
+    with pytest.warns(UserWarning):
+        updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"))
+
+    assert len(patch_json_and_utils["update_config_entries"]) == 1
+    _, updates = patch_json_and_utils["update_config_entries"][0]
+    assert "perturbations" not in updates

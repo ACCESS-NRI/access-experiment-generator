@@ -310,3 +310,11 @@ def test_mapping_value_is_remove_preserved_as_string(tmp_repo_dir, indata):
     # Expect 'REMOVE' to be preserved as a value (not dropped) by _filter_value
     res = expt._extract_run_specific_params(param_dict, indx=0, total_exps=2)
     assert res == {"outer": {"v": "REMOVE"}}
+
+
+def test_list_of_lists_index_true_and_false(tmp_repo_dir, indata):
+    expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
+    # pick a non-empty inner list
+    assert expt._extract_run_specific_params({"k": [["A"], ["B"]]}, 1, 2) == {"k": ["B"]}
+    # pick the inner list that cleans to empty -> _drop
+    assert expt._extract_run_specific_params({"k": [["A"], ["REMOVE"]]}, 1, 2) == {}
