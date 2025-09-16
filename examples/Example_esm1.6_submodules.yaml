@@ -14,128 +14,200 @@ Control_Experiment:
 # No changes to apply for the control branch
 
 Perturbation_Experiment:
+    # This section contains one or more parameter blocks, each defining a set of perturbation branches.
+    #
+    # Below illustrates two valid patterns for describing *list of dicts* inventories (e.g. `submodels`) 
+    # when working with two branches.
+    #
+    # ─────────────────────────────────────────────────────────────────────────────
+    # General notes
+    # ─────────────────────────────────────────────────────────────────────────────
+    # * Each block must declare its branches:
+    #       branches:
+    #         - perturb_1
+    #         - perturb_2
+    # NOTE: branch names must be unique across all blocks!
+    #
+    # * Under a list such as `submodels`, always include the **entire**
+    #   list of items, even if you only modify one field in one item.
+    #
+    # * Scalars/strings apply to all branches.
+    # * Lists whose length == number of branches are index-selected
+    #   (element i -> branch i).
+    #
+    # ─────────────────────────────────────────────────────────────────────────────
+    # Pattern 1: One inventory broadcast to all branches
+    # ─────────────────────────────────────────────────────────────────────────────
+    # Use a single outer element that is a list (that is the "- - " form), and put the entire
+    # set of items inside. Per-branch differences then live inside individual fields using 
+    # per-branch lists (e.g., `ncpus: [208, 416]` below).
+    #
+    # Example:
+    #
+    # branches:
+    #   - perturb_1a
+    #   - perturb_2a
+    #
+    # config.yaml:
+    #   submodels:
+    #     - - name: atmosphere
+    #         model: um
+    #         ncpus:
+    #           - 208
+    #           - 416
+    #         exe: um_hg3.exe
+    #         input:
+    #           - - /path/to/atmos/input/file1 # for perturb_1a/perturb_2a
+    #             - /path/to/atmos/input/file2 # for perturb_1a/perturb_2a
+    #     - name: ocean
+    #       model: mom
+    #       ncpus:
+    #         - 196
+    #         - 392
+    #       exe: mom5_access_cm
+    #       input:
+    #         - - /path/to/ocean/input/file1 # for perturb_1a/perturb_2a
+    #           - /path/to/ocean/input/file2 # for perturb_1a/perturb_2a
+    #
+    # In this first pattern, the entire inventory is shared by all branches!
+    #
+    # NOTE:
+    # 1. The `- -` prefix is only needed because `submodels` is a *list of dicts*
+    #    and you’re broadcasting that list as a single block. For simple values
+    #    (scalars, flat lists) you don’t need it (`- -`).
+    #
+    # 2. In the `input` field above, a single nested *list of lists* is used to indicate
+    #    that all branches use the same input files.
+    #    If different branches need different input files,
+    #    input:
+    #      - - /path/to/atmos/input/file1 # for perturb_1a
+    #        - /path/to/atmos/input/file2 # for perturb_1a
+    #      - - /path/to/atmos/input/file3 # for perturb_2a
+    #        - /path/to/atmos/input/file4 # for perturb_2a
+    #
+    # ─────────────────────────────────────────────────────────────────────────────
+    # Pattern 2: Each branch has its own full inventory
+    # ─────────────────────────────────────────────────────────────────────────────
+    # Make the outer list length == number of branches. Each outer element is a complete inventory for that branch.
+    #
+    # Example:
+    # config.yaml:
+    #   submodels:
+    #     - - name: atmosphere
+    #         model: um
+    #         ncpus: 208
+    #         exe: um_hg3.exe
+    #         input:
+    #           - /path/to/atmos/input/file1 # for perturb_1b
+    #           - /path/to/atmos/input/file2 # for perturb_1b
+    #       - name: ocean
+    #         model: mom
+    #         ncpus: 196
+    #         exe: mom5_access_cm
+    #         input:
+    #           - /path/to/ocean/input/file1 # for perturb_1b
+    #           - /path/to/ocean/input/file2 # for perturb_1b
+    #     - - name: atmosphere
+    #         model: um
+    #         ncpus: 416
+    #         exe: um_hg3.exe
+    #         input:
+    #           - /path/to/atmos/input/file1 # for perturb_2b
+    #           - /path/to/atmos/input/file2 # for perturb_2b
+    #       - name: ocean
+    #         model: mom
+    #         ncpus: 392
+    #         exe: mom5_access_cm
+    #         input:
+    #           - /path/to/ocean/input/file1 # for perturb_2b
+    #           - /path/to/ocean/input/file2 # for perturb_2b
+    #
+    # In this second pattern, each branch has its own complete inventory.
+    #
+    # ─────────────────────────────────────────────────────────────────────────────
+    # Choosing a pattern!
+    # ─────────────────────────────────────────────────────────────────────────────
+    # Use Pattern 1 when every branch shares most of the same settings, and only a few
+    # parameters vary per branch (e.g. ncpus).
+    # Use Pattern 2 when each branch has a very different inventory (e.g., different
+    # input files, exe, etc.).
+    # IMPORTANT: DO NOT mix the two patterns in the same list!
+
   Parameter_block1:
-    # This block defines two perturbation branches that vary per-submodel cpu counts.
-    # You can extend this to change other parameters (e.g., exe, input files, etc.).
-    #
-    # Notes:
-    # - Under a list, such as `submodels`, one must provide the entire list of submodels
-    #   even if only one submodel is being changed.
-    # - If a parameter value is a single scalar/string, it is used for all branches.
-    # - If a parameter value is a list whose length == number of branches, the i-th
-    #   element is used for the i-th branch (index selection).
-    #
-    # About nested lists for inputs:
-    # - A leading "- -" indicates a single (nested) list, i.e. one list of multiple
-    #   paths applied as-is (broadcast) to all branches.
-    # - To supply different input lists per branch, provide a *list of lists* where
-    #   the outer list length equals the number of branches.
-
-    # Example: a single nested list (broadcast to all branches)
-    # input:
-    #   - - /path/to/kmt.nc
-    #     - /path/to/grid.nc
-    #     - /path/to/iceberg_flux.nc
-    #
-    # Example: branch-specific nested lists (outer list length == number of branches)
-    # input:
-    #   - - /path/to/kmt.nc
-    #     - /path/to/grid.nc
-    #     - /path/to/iceberg_flux.nc
-    #   - - /path/to/kmt2.nc
-    #     - /path/to/grid2.nc
-    #     - /path/to/iceberg_flux2.nc
-
-    branches: 
-      - perturb_1
-      - perturb_2
+  # Pattern 1: single inventory broadcast to all branches, with per-branch differences
+    branches:
+      - perturb_1a
+      - perturb_2a
 
     config.yaml:
       submodels:
-        - name: atmosphere
-          model: um
-          ncpus:
-            - 208
-            - 416
-          exe: um_hg3.exe
-          input:
-              # single nested list -> same files used by all branches
-              # Aerosols
-            - - /g/data/vk83/prerelease/configurations/inputs/access-esm1p6/modern/pre-industrial/atmosphere/aerosol/global.N96/2025.06.04/OCFF_1850_cmip7.anc
+        - - name: atmosphere
+            model: um
+            ncpus:
+              - 208
+              - 416
+            exe: um_hg3.exe
+            input:
+                # single nested list -> same files used by all branches
+                # Aerosols
+              - - /g/data/vk83/prerelease/configurations/inputs/access-esm1p6/modern/pre-industrial/atmosphere/aerosol/global.N96/2025.06.04/OCFF_1850_cmip7.anc
+                - /g/data/vk83/prerelease/configurations/inputs/access-esm1p6/modern/pre-industrial/atmosphere/aerosol/global.N96/2025.06.04/BC_1850_cmip7.anc
+
+          - name: ocean
+            model: mom
+            ncpus:
+              - 196
+              - 392
+            exe: mom5_access_cm 
+            input:
+                # Biogeochemistry
+              - - /g/data/vk83/configurations/inputs/access-esm1p5/modern/share/ocean/biogeochemistry/global.1deg/2020.05.19/dust.nc
+                - /g/data/vk83/configurations/inputs/access-esm1p5/modern/share/ocean/biogeochemistry/global.1deg/2020.05.19/ocmip2_press_monthly_om1p5_bc.nc
+
+  Parameter_block2:
+  # Pattern 2: each branch has its own inventory
+    branches: 
+      - perturb_1b
+      - perturb_2b
+
+    config.yaml:
+      submodels:
+      # first branch 
+        - - name: atmosphere
+            model: um
+            ncpus: 208
+            exe: um_hg3.exe
+            input:
+                # single nested list -> same files used by all branches
+                # Aerosols
+              - /g/data/vk83/prerelease/configurations/inputs/access-esm1p6/modern/pre-industrial/atmosphere/aerosol/global.N96/2025.06.04/OCFF_1850_cmip7.anc
               - /g/data/vk83/prerelease/configurations/inputs/access-esm1p6/modern/pre-industrial/atmosphere/aerosol/global.N96/2025.06.04/BC_1850_cmip7.anc
-              - /g/data/vk83/prerelease/configurations/inputs/access-esm1p6/modern/pre-industrial/atmosphere/aerosol/global.N96/2025.06.04/scycl_1850_cmip7.anc
-              - /g/data/vk83/prerelease/configurations/inputs/access-esm1p6/modern/pre-industrial/atmosphere/aerosol/global.N96/2025.06.04/Bio_1850_cmip7.anc
-              - /g/data/vk83/configurations/inputs/access-esm1p5/modern/share/atmosphere/aerosol/global.N96/2020.05.19/biogenic_351sm.N96L38
-              - /g/data/vk83/configurations/inputs/access-esm1p5/modern/share/atmosphere/aerosol/global.N96/2020.05.19/sulpc_oxidants_N96_L38
-              - /g/data/vk83/configurations/inputs/access-esm1p5/modern/share/atmosphere/aerosol/global.N96/2020.05.19/DMS_conc.N96
-              # Forcing
-              - /g/data/vk83/configurations/inputs/access-esm1p5/modern/pre-industrial/atmosphere/forcing/global.N96/2020.05.19/ozone_1850_ESM1.anc
-              - /g/data/vk83/configurations/inputs/access-esm1p5/modern/pre-industrial/atmosphere/forcing/resolution_independent/2020.05.19/volcts_18502000ave.dat
-              # Land
-              - /g/data/vk83/configurations/inputs/access-esm1p5/modern/pre-industrial/atmosphere/land/biogeochemistry/global.N96/2020.05.19/Ndep_1850_ESM1.anc
-              - /g/data/vk83/configurations/inputs/access-esm1p5/modern/share/atmosphere/land/soiltype/global.N96/2020.05.19/qrparm.soil_igbp_vg
-              - /g/data/vk83/configurations/inputs/access-esm1p5/modern/share/atmosphere/land/vegetation/global.N96/2020.05.19/cable_vegfunc_N96.anc
-              - /g/data/vk83/prerelease/configurations/inputs/access-esm1p6/share/atmosphere/land/biogeochemistry/resolution_independent/2025.06.06/modis_phenology_csiro_nophase.txt
-              - /g/data/vk83/prerelease/configurations/inputs/access-esm1p6/share/atmosphere/land/biogeochemistry/resolution_independent/2024.12.18/pftlookup_cable3.csv
-              - /g/data/vk83/configurations/inputs/access-esm1p5/share/atmosphere/land/biogeophysics/resolution_independent/2020.05.19/def_soil_params.txt
-              - /g/data/vk83/configurations/inputs/access-esm1p5/share/atmosphere/land/biogeophysics/resolution_independent/2020.05.19/def_veg_params.txt
-              # Spectral
-              - /g/data/vk83/configurations/inputs/access-esm1p5/share/atmosphere/spectral/resolution_independent/2020.05.19/spec3a_sw_hadgem1_6on
-              - /g/data/vk83/configurations/inputs/access-esm1p5/share/atmosphere/spectral/resolution_independent/2020.05.19/spec3a_lw_hadgem1_6on
-              # Grids
-              - /g/data/vk83/configurations/inputs/access-esm1p5/modern/share/atmosphere/grids/global.N96/2020.05.19/qrparm.mask
-              - /g/data/vk83/configurations/inputs/access-esm1p5/share/atmosphere/grids/resolution_independent/2020.05.19/vertlevs_G3
-              # STASH
-              - /g/data/vk83/configurations/inputs/access-esm1p5/share/atmosphere/stash/2020.05.19/
 
-        - name: ocean
-          model: mom
-          ncpus:
-            - 196
-            - 392
-          exe: mom5_access_cm 
-          input:
-              # Biogeochemistry
-            - - /g/data/vk83/configurations/inputs/access-esm1p5/modern/share/ocean/biogeochemistry/global.1deg/2020.05.19/dust.nc
+          - name: ocean
+            model: mom
+            ncpus: 196
+            exe: mom5_access_cm 
+            input:
+                # Biogeochemistry
+              - /g/data/vk83/configurations/inputs/access-esm1p5/modern/share/ocean/biogeochemistry/global.1deg/2020.05.19/dust.nc
               - /g/data/vk83/configurations/inputs/access-esm1p5/modern/share/ocean/biogeochemistry/global.1deg/2020.05.19/ocmip2_press_monthly_om1p5_bc.nc
-              # Tides
-              - /g/data/vk83/configurations/inputs/access-esm1p5/modern/share/ocean/tides/global.1deg/2020.05.19/roughness_amp.nc
-              - /g/data/vk83/configurations/inputs/access-esm1p5/modern/share/ocean/tides/global.1deg/2020.05.19/tideamp.nc
-              # Shortwave
-              - /g/data/vk83/configurations/inputs/access-esm1p6/modern/share/ocean/shortwave_penetration/global.1deg/2025.06.23/ssw_atten_depth.nc
-              # Grids
-              - /g/data/vk83/configurations/inputs/access-esm1p6/modern/share/ocean/grids/mosaic/global.1deg/2025.07.29/grid_spec.nc
-              - /g/data/vk83/configurations/inputs/access-esm1p6/modern/share/ocean/grids/mosaic/global.1deg/2025.07.29/ocean_mosaic.nc
-              - /g/data/vk83/configurations/inputs/access-esm1p6/modern/share/ocean/grids/mosaic/global.1deg/2025.07.29/ocean_hgrid.nc
-              - /g/data/vk83/configurations/inputs/access-esm1p6/modern/share/ocean/grids/bathymetry/global.1deg/2025.07.29/topog.nc
-              - /g/data/vk83/configurations/inputs/access-esm1p6/modern/share/ocean/grids/vertical/global.1deg/2025.07.29/ocean_vgrid.nc
 
-        - name: ice
-          model: cice5
-          ncpus:
-            - 12
-            - 24
-          exe: cice_access-esm1.6_360x300_12x1_12p.exe
-          input:
-              # Grids
-            - - /g/data/vk83/configurations/inputs/access-esm1p6/modern/share/ice/grids/global.1deg/2025.07.29/kmt.nc
-              - /g/data/vk83/configurations/inputs/access-esm1p6/modern/share/ice/grids/global.1deg/2025.07.29/grid.nc
-              # Iceberg flux
-              - /g/data/vk83/prerelease/configurations/inputs/access-esm1p6/modern/share/ice/iceberg/global.1deg/2024.11.08/lice_discharge_iceberg.nc
+      # second branch
+        - - name: atmosphere
+            model: um
+            ncpus: 416
+            exe: um_hg3.exe
+            input:
+                # single nested list -> same files used by all branches
+                # Aerosols
+              - /g/data/vk83/prerelease/configurations/inputs/access-esm1p6/modern/pre-industrial/atmosphere/aerosol/global.N96/2025.06.04/OCFF_1850_cmip7.anc
+              - /g/data/vk83/prerelease/configurations/inputs/access-esm1p6/modern/pre-industrial/atmosphere/aerosol/global.N96/2025.06.04/BC_1850_cmip7.anc
 
-        - name: coupler
-          model: oasis
-          ncpus: 0
-          input:
-              # Grids
-            - - /g/data/vk83/configurations/inputs/access-esm1p6/modern/share/coupler/grids/global.oi_1deg.a_N96/2025.07.29/grids.nc
-              - /g/data/vk83/configurations/inputs/access-esm1p6/modern/share/coupler/grids/global.oi_1deg.a_N96/2025.07.29/areas.nc
-              - /g/data/vk83/configurations/inputs/access-esm1p5/modern/share/coupler/grids/global.oi_1deg.a_N96/2020.05.19/masks.nc
-              # Remapping weights
-              - /g/data/vk83/configurations/inputs/access-esm1p6/modern/share/coupler/remapping_weights/global.oi_1deg.a_N96/2025.08.06/rmp_cice_to_um1t_CONSERV_FRACNNEI.nc
-              - /g/data/vk83/configurations/inputs/access-esm1p6/modern/share/coupler/remapping_weights/global.oi_1deg.a_N96/2025.08.06/rmp_cice_to_um1u_CONSERV_FRACNNEI.nc
-              - /g/data/vk83/configurations/inputs/access-esm1p6/modern/share/coupler/remapping_weights/global.oi_1deg.a_N96/2025.08.06/rmp_cice_to_um1v_CONSERV_FRACNNEI.nc
-              - /g/data/vk83/configurations/inputs/access-esm1p6/modern/share/coupler/remapping_weights/global.oi_1deg.a_N96/2025.08.06/rmp_um1t_to_cice_CONSERV_DESTAREA.nc
-              - /g/data/vk83/configurations/inputs/access-esm1p6/modern/share/coupler/remapping_weights/global.oi_1deg.a_N96/2025.08.06/rmp_um1t_to_cice_CONSERV_FRACNNEI.nc
-              - /g/data/vk83/configurations/inputs/access-esm1p6/modern/share/coupler/remapping_weights/global.oi_1deg.a_N96/2025.08.06/rmp_um1u_to_cice_CONSERV_FRACNNEI.nc
-              - /g/data/vk83/configurations/inputs/access-esm1p6/modern/share/coupler/remapping_weights/global.oi_1deg.a_N96/2025.08.06/rmp_um1v_to_cice_CONSERV_FRACNNEI.nc
+          - name: ocean
+            model: mom
+            ncpus: 392
+            exe: mom5_access_cm 
+            input:
+                # Biogeochemistry
+              - /g/data/vk83/configurations/inputs/access-esm1p5/modern/share/ocean/biogeochemistry/global.1deg/2020.05.19/dust.nc
+              - /g/data/vk83/configurations/inputs/access-esm1p5/modern/share/ocean/biogeochemistry/global.1deg/2020.05.19/ocmip2_press_monthly_om1p5_bc.nc
