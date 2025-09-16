@@ -8,20 +8,6 @@ required = ["type", "dimension", "value", "calendar", "comment"]
 allowed_types = {"scaling", "offset", "separable", REMOVED}
 
 
-def _unwrap_broadcast(v, key=None):
-    """
-    Unwrap typical extractor shapes:
-      - [scalar] -> scalar
-      - [[a,b]] -> [a,b]  (only for dimension/value)
-    """
-    if isinstance(v, list) and len(v) == 1:
-        inner = v[0]
-        if key in ("dimension", "value") and isinstance(inner, list):
-            return inner
-        return inner
-    return v
-
-
 class Om2ForcingUpdater:
     """
     A utility class for updating OM2 forcing files, e.g., `forcing.json`
@@ -93,9 +79,6 @@ class Om2ForcingUpdater:
         cleaned = []
         for p in perts:
             q = dict(p)
-            for k in required:
-                if k in q:
-                    q[k] = _unwrap_broadcast(q[k], k)
             t_ = q.get("type")
 
             # skip if REMOVED

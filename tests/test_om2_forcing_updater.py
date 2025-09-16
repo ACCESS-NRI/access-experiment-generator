@@ -240,13 +240,3 @@ def test_invalid_type_branch_removes_perturbations(tmp_repo_dir, patch_json_and_
 
     assert patch_json_and_utils["update_config_entries"] == []
     assert patch_json_and_utils["write_json"] == []
-
-
-def test_unwrap_broadcast_scalar_and_pairs():
-    # [scalar] -> scalar
-    assert om2_forcing_module._unwrap_broadcast([5], key="value") == 5
-    # [[a,b]] -> [a,b] for dimension/value
-    assert om2_forcing_module._unwrap_broadcast([["temporal", "spatial"]], key="dimension") == ["temporal", "spatial"]
-    assert om2_forcing_module._unwrap_broadcast([["a.nc", "b.nc"]], key="value") == ["a.nc", "b.nc"]
-    # pass through
-    assert om2_forcing_module._unwrap_broadcast("forcing", key="calendar") == "forcing"
