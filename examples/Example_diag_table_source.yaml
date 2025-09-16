@@ -1,0 +1,223 @@
+# Experiment Configuration File
+# This file sets up parameters for both the control and perturbation experiments.
+# Adjust the settings below as needed for your environment and model.
+
+model_type: access-om3 # Specify the model ("access-om2", "access-om3", "access-esm1.5", or "access-esm1.6")
+repository_url: git@github.com:ACCESS-NRI/access-om3-configs.git
+start_point: "52bf0b6" # Control commit hash for new branches
+test_path: prototype-0.4-dict-of-dicts # All control and perturbation experiment repositories will be created here; can be relative, absolute or ~ (user-defined)
+repository_directory: MC_25km_jra_ryf # Local directory name for the central repository (user-defined)
+
+control_branch_name: ctrl
+
+Control_Experiment:
+# No changes to apply for the control branch
+
+Perturbation_Experiment:
+    # This section contains one or more parameter blocks, each defining a set of perturbation branches.
+    #
+    # Below illustrates two valid patterns for describing *dict of dicts* inventories (e.g. `diag_table`) 
+    # when working with two branches.
+    #
+    # ─────────────────────────────────────────────────────────────────────────────
+    # General notes
+    # ─────────────────────────────────────────────────────────────────────────────
+    # * Each block must declare its branches:
+    #       branches:
+    #         - perturb_1
+    #         - perturb_2
+    # NOTE: branch names must be unique across all blocks!
+    #
+    # * A `diag_table` is conceptually:
+    #       list -> { diagnostic_section: { defaults: {...}, fields: [...] } }
+    #   That is:
+    #       - The outermost container is a YAML list (indicated by “-”).
+    #       - Each list element is a dict keyed by the diagnostic section.
+    #       - Under each section:
+    #           defaults: shared attributes (normally identical across branches)
+    #           fields:   variables to output, with branch selection rules.
+    #
+    # * Branch selection rules for `fields`:
+    #       - If `fields` is a single mapping, it applies to all branches.
+    #       - If `fields` is a list whose length == number of branches, element i
+    #         applies to branch i (0-based).
+    #       - Inside each branch’s dict, keys are variable names; values are optional
+    #         (they may be left blank / null).
+    #
+    # ─────────────────────────────────────────────────────────────────────────────
+    # Pattern 1: One diagnostic with branch-indexed fields
+    # ─────────────────────────────────────────────────────────────────────────────
+    # Use a single diagnostic entry and supply its `fields` as a list, where each
+    # element is a mapping of variables for that branch.
+    #
+    # Example:
+    #
+    # Parameter_block1:
+    #   branches:
+    #     - perturb_1a
+    #     - perturb_2a
+    #
+    #   diagnostic_profiles/source_yaml_files/diag_table_standard_source.yaml:
+    #     diag_table:
+    #       - 'daily scalar timeseries2':
+    #           defaults:
+    #             file_name_dimension: scalar
+    #             file_name:
+    #               - - file_name_prefix
+    #                 - file_name_dimension
+    #                 - output_freq
+    #                 - '':
+    #                     - output_freq_units
+    #                 - reduction_method
+    #                 - file_name_date
+    #             output_freq_units: days
+    #             reduction_method: snap
+    #             packing: 1
+    #
+    #           fields:
+    #             - soga: # only for perturb_1a
+    #               thetaoga: # only for perturb_1a
+    #             - total_wfo: # only for perturb_2a
+    #               total_evs: # only for perturb_2a
+    #
+    # In this pattern, `defaults` is shared by all branches, and each branch
+    # selects its own mapping from the `fields` list.
+    #
+    # ─────────────────────────────────────────────────────────────────────────────
+    # Pattern 2: Separate diagnostic entry per branch
+    # ─────────────────────────────────────────────────────────────────────────────
+    # Instead of one entry with indexed `fields`, define two diagnostic
+    # entries (one for each branch) at the same list level.
+    #
+    # Example:
+    #
+    # Parameter_block2:
+    #   branches:
+    #     - perturb_1b
+    #     - perturb_2b
+    #
+    #   diagnostic_profiles/source_yaml_files/diag_table_standard_source.yaml:
+    #     diag_table:
+    #       - 'daily scalar timeseries2':
+    #           defaults:
+    #             file_name_dimension: scalar
+    #             file_name:
+    #               - - file_name_prefix
+    #                 - file_name_dimension
+    #                 - output_freq
+    #                 - '':
+    #                     - output_freq_units
+    #                 - reduction_method
+    #                 - file_name_date
+    #             output_freq_units: days
+    #             reduction_method: snap
+    #             packing: 1
+    #
+    #           fields:
+    #             soga: # variables for perturb_1b
+    #             thetaoga:
+    #
+    #       - 'daily scalar timeseries2':
+    #           defaults:
+    #             file_name_dimension: scalar
+    #             file_name:
+    #               - - file_name_prefix
+    #                 - file_name_dimension
+    #                 - output_freq
+    #                 - '':
+    #                     - output_freq_units
+    #                 - reduction_method
+    #                 - file_name_date
+    #             output_freq_units: days
+    #             reduction_method: snap
+    #             packing: 1
+    #
+    #           fields:
+    #             total_wfo: # variables for perturb_2b
+    #             total_evs:
+    #
+    # In this second pattern, each branch has its own top-level dictionary for the
+    # same diagnostic name. The engine matches entries to branches by order.
+    #
+    # ─────────────────────────────────────────────────────────────────────────────
+    # Choosing a pattern!
+    # ─────────────────────────────────────────────────────────────────────────────
+    #
+    # * Use Pattern 1 when diagnostics share the same defaults and only the set
+    #   of fields differs per branch.
+    # * Use Pattern 2 when branches need completely independent diagnostic entries
+    #   (e.g. one branch drops or radically redefines a table).
+    #
+    # IMPORTANT: DO NOT mix both representations inside the same diagnostic list.
+
+  Parameter_block1:
+    branches:
+      - perturb_1a
+      - perturb_2a
+
+    diagnostic_profiles/source_yaml_files/diag_table_standard_source.yaml:
+      diag_table:
+        - 'daily scalar timeseries2':
+            defaults:
+              file_name_dimension: scalar
+              file_name:
+                - - file_name_prefix
+                  - file_name_dimension
+                  - output_freq
+                  - '':
+                      - output_freq_units
+                  - reduction_method
+                  - file_name_date
+              output_freq_units: days
+              reduction_method: snap
+              packing: 1
+            
+            fields:
+              - soga: # for perturb_1a
+                thetaoga: # for perturb_1a
+              - total_wfo: # for perturb_2a
+                total_evs: # for perturb_2a
+
+  Parameter_block2:
+    branches:
+      - perturb_1b
+      - perturb_2b
+
+    diagnostic_profiles/source_yaml_files/diag_table_standard_source.yaml:
+      diag_table:
+        - 'daily scalar timeseries2':
+            defaults:
+              file_name_dimension: scalar
+              file_name:
+                - - file_name_prefix
+                  - file_name_dimension
+                  - output_freq
+                  - '':
+                      - output_freq_units
+                  - reduction_method
+                  - file_name_date
+              output_freq_units: days
+              reduction_method: snap
+              packing: 1
+
+            fields:
+              soga: # for perturb_1b
+              thetaoga: # for perturb_1b
+        - 'daily scalar timeseries2':
+            defaults:
+              file_name_dimension: scalar
+              file_name:
+                - - file_name_prefix
+                  - file_name_dimension
+                  - output_freq
+                  - '':
+                      - output_freq_units
+                  - reduction_method
+                  - file_name_date
+              output_freq_units: days
+              reduction_method: snap
+              packing: 1
+            
+            fields:
+              total_wfo: # for perturb_2b
+              total_evs: # for perturb_2b
