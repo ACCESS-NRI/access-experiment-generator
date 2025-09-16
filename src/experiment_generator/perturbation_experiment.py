@@ -190,10 +190,17 @@ class PerturbationExperiment(BaseExperiment):
 
         Rules:
          - Mapping (dict): recursively extract for each key.
-         - list of dicts: recurse each dict, if all dicts are the same, return a single dict.
+         - list of dicts:
+            - outer_len == 1; treats as a broadcast, unwraps the inner dict and applies it to all branches.
+            - outer_len == total_exps; extracts by index.
+            - else -> error (len must equal total_exps)
          - list of lists:
-            - if outer length == 1: treats as a broadcast, unwraps the inner list and applies it to all branches.
+            - if outer length == 1
+                - if inner is empty, drops the parent key.
+                - if inner is list of dicts, recurses for each dict.
+                - else applies _select_from_list to the inner list.
             - if outer length == total_exps: extracts by index.
+            - else -> error (len must equal total_exps)
          - plain list (scalars, strings):
             - if outer length == 1: broadcasts the single value to all branches.
             - if outer length == total_exps: extracts by index.
@@ -201,9 +208,9 @@ class PerturbationExperiment(BaseExperiment):
          - other scalar / strings: broadcasts the single value to all branches.
 
          -  Filtering:
-            - In lists/mappings, the literal `REMOVE` string in elements/values is dropped.
-                - None/empty value (`null`, `~`, ``) are preserved as-is.
-                - any list element that becomes an empty dict after cleaning is dropped - (OM2-forcing specific tidy-up)
+            - The literal delete marker `REMOVE` is preserved by the selector (so the updater can drop keys).
+            - After cleaning, empty lists and empty dicts are dropped (parent key omitted).
+            - `None`/null values are preserved as-is (not removed).
         """
 
         def _is_seq(x) -> bool:
@@ -211,16 +218,7 @@ class PerturbationExperiment(BaseExperiment):
 
         def _filter_value(x):
             """
-            Recursively apply removal rules to any shape; returns:
-                - the cleaned value,
-                - or the _drop marker to indicate the parent should drop this key/element.
-
-            Rules:
-                - preserve the explicit delete marker `REMOVE` when encountered as a value;
-                  callers decide whether to drop keys or propagate the marker.
-                - Remove list elements that are `REMOVE`.
-                - Remove keys whose filtered value is an empty list or `_drop`.
-                - Remove empty dicts.
+            Clean values; return (keep: bool, cleaned).
             """
             # Preserve explicit delete marker as a value (not dropped here)
             if _is_removed_str(x):
@@ -231,46 +229,28 @@ class PerturbationExperiment(BaseExperiment):
                 res = type(x)()
                 for k, v in x.items():
                     keep_v, filtered_v = _filter_value(v)
-                    # if not keep_v:
-                    #     # remove this key
-                    #     continue
-                    # if filtered_v is a sequence that cleaned to empty, drop the key
-                    # if _is_seq(filtered_v) and len(filtered_v) == 0:
-                    #     continue
-                    # then keep this key
                     res[k] = filtered_v
-                if not res:
-                    # if the dict is empty after filtering, drop it
-                    return False, None
-                return True, res
+                return (False, None) if not res else (True, res)
+
             # Sequence (list etc); clean each element and drop empties/_drop
             if _is_seq(x):
-                # print(f"Cleaning sequence: {x}")
-                # filter each element, preserve type
                 elements = []
                 for v in x:
                     keep_v, filtered_v = _filter_value(v)
-                    # if not keep_v:
-                    #     # drop this element
-                    #     continue
-                    # drop empty sub-sequences
-                    # if _is_seq(filtered_v) and len(filtered_v) == 0:
-                    #     continue
-                    # keep this element
                     elements.append(filtered_v)
-                if not elements:
-                    return False, None
+                return (False, None) if not elements else (True, elements)
 
-                return True, elements
             # # Scalar, str, None, etc
             return True, x
 
         def _select_from_list(row: list):
+            """
+            Clean a list and select the appropriate element for this run index.
+            """
             keep_v, cleaned = _filter_value(row)
             if not keep_v:
                 return False, None
-            # if the selected (cleaned) value is the literal REMOVE,
-            # we must propagate it so the updater can pop the key.
+            # Propagate literal REMOVE (non-sequence) upwards
             if _is_removed_str(cleaned) and not _is_seq(cleaned):
                 return True, cleaned
             return True, cleaned
@@ -278,9 +258,8 @@ class PerturbationExperiment(BaseExperiment):
         result = {}
         for key, value in nested_dict.items():
             # nested dictionary (Mapping)
-            if isinstance(value, dict):
-                tmp = self._extract_run_specific_params(value, indx, total_exps)
-                keep_v, cleaned = _filter_value(tmp)
+            if isinstance(value, Mapping):
+                keep_v, cleaned = _filter_value(self._extract_run_specific_params(value, indx, total_exps))
                 if keep_v:
                     result[key] = cleaned
                 continue
@@ -288,27 +267,26 @@ class PerturbationExperiment(BaseExperiment):
             # list or list of dicts/lists (Sequence)
             if isinstance(value, list):
                 # if it's a list of dicts (e.g., for submodels in `config.yaml` in OM2)
-                if value and all(isinstance(i, dict) for i in value):
-                    # print(value)
+                if value and all(isinstance(i, Mapping) for i in value):
                     outer_len = len(value)
+
+                    # Clean each item first (so empties fall out)
                     cleaned_items = []
                     for item in value:
-                        item_params = self._extract_run_specific_params(item, indx, total_exps)
-                        keep_v, item_clean = _filter_value(item_params)
+                        keep_v, item_clean = _filter_value(self._extract_run_specific_params(item, indx, total_exps))
                         if keep_v:
                             cleaned_items.append(item_clean)
                     if not cleaned_items:
                         continue
 
                     if outer_len == 1:
-                        sel = cleaned_items[0]
+                        result[key] = cleaned_items[0]  # broadcast the single dict to all branches
                     elif outer_len == total_exps:
-                        sel = cleaned_items[indx]
+                        result[key] = cleaned_items[indx]  # select by index
                     else:
                         raise ValueError(
                             f"For key '{key}', expected outer list-of-dicts length 1 or {total_exps}, got {outer_len}"
                         )
-                    result[key] = sel
                     continue
 
                 # list of lists
@@ -318,7 +296,7 @@ class PerturbationExperiment(BaseExperiment):
                         # broadcasting an inner inventory
                         inner = value[0]
 
-                        # if inner is empty, drop the parent key
+                        # if inner is empty, drop the parent key suchas queue: [[]]
                         if isinstance(inner, list) and len(inner) == 0:
                             continue
 
@@ -329,6 +307,7 @@ class PerturbationExperiment(BaseExperiment):
                                 items.append(self._extract_run_specific_params(d, indx, total_exps))
                             result[key] = items
                             continue
+                        # otherwise, treat as a plain list
                         keep_v, sel = _select_from_list(inner)
                     elif outer_len == total_exps:
                         keep_v, sel = _select_from_list(value[indx])
