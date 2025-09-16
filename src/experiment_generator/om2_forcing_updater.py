@@ -2,10 +2,10 @@ from pathlib import Path
 from .tmp_parser.json_parser import read_json, write_json
 from .utils import update_config_entries
 import warnings
-from .common_var import REMOVED
+from .common_var import _is_removed_str, REMOVED
 
 required = ["type", "dimension", "value", "calendar", "comment"]
-allowed_types = {"scaling", "offset", "separable"}
+allowed_types = {"scaling", "offset", "separable", REMOVED}
 
 
 def _unwrap_broadcast(v, key=None):
@@ -99,16 +99,16 @@ class Om2ForcingUpdater:
             t_ = q.get("type")
 
             # skip if REMOVED
-            if isinstance(t_, str) and t_ == REMOVED:
+            if _is_removed_str(t_):
                 continue
 
             # drop invalid type
             if not isinstance(t_, str) or t_ not in allowed_types:
-                warnings.warn(
-                    f"-- forcing.json '{fieldname}': perturbation with invalid type '{t_}' found; skipping.",
-                    UserWarning,
+                raise ValueError(
+                    f"-- forcing.json '{fieldname}': perturbation has invalid type '{t_}'. "
+                    f"Allowed types: {sorted(allowed_types)}"
                 )
-                continue
+
             cleaned.append(q)
 
         if not cleaned:

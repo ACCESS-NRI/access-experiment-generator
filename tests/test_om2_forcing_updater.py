@@ -235,12 +235,11 @@ def test_invalid_type_branch_removes_perturbations(tmp_repo_dir, patch_json_and_
         }
     }
 
-    with pytest.warns(UserWarning):
+    with pytest.raises(ValueError):
         updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"))
 
-    assert len(patch_json_and_utils["update_config_entries"]) == 1
-    _, updates = patch_json_and_utils["update_config_entries"][0]
-    assert "perturbations" not in updates
+    assert patch_json_and_utils["update_config_entries"] == []
+    assert patch_json_and_utils["write_json"] == []
 
 
 def test_unwrap_broadcast_scalar_and_pairs():
