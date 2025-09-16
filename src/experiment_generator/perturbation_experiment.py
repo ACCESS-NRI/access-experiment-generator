@@ -12,7 +12,7 @@ from .nuopc_runconfig_updater import NuopcRunConfigUpdater
 from .mom6_input_updater import Mom6InputUpdater
 from .nuopc_runseq_updater import NuopcRunseqUpdater
 from .om2_forcing_updater import Om2ForcingUpdater
-from .common_var import REMOVED, BRANCH_KEY
+from .common_var import BRANCH_KEY, _is_removed_str
 
 
 @dataclass
@@ -206,18 +206,6 @@ class PerturbationExperiment(BaseExperiment):
                 - any list element that becomes an empty dict after cleaning is dropped - (OM2-forcing specific tidy-up)
         """
 
-        class _Drop:
-            """
-            marker used internally to indicate a key/element should be dropped.
-            """
-
-            pass
-
-        _drop = _Drop()
-
-        def _is_removed_str(x) -> bool:
-            return isinstance(x, str) and x == REMOVED
-
         def _is_seq(x) -> bool:
             return isinstance(x, Sequence) and not isinstance(x, str)
 
@@ -236,111 +224,140 @@ class PerturbationExperiment(BaseExperiment):
             """
             # Preserve explicit delete marker as a value (not dropped here)
             if _is_removed_str(x):
-                return x
+                return True, x
 
             # Mapping (dict, CommentedMap, etc); clean values and prune empties
             if isinstance(x, Mapping):
                 res = type(x)()
                 for k, v in x.items():
-                    filtered_v = _filter_value(v)
-                    if filtered_v is _drop:
-                        # remove this key
-                        continue
-                    # if _is_seq(filtered_v) and len(filtered_v) == 0:
-                    #     # remove this key if the filtered value is an empty list
+                    keep_v, filtered_v = _filter_value(v)
+                    # if not keep_v:
+                    #     # remove this key
                     #     continue
-                    # keep this key
+                    # if filtered_v is a sequence that cleaned to empty, drop the key
+                    # if _is_seq(filtered_v) and len(filtered_v) == 0:
+                    #     continue
+                    # then keep this key
                     res[k] = filtered_v
                 if not res:
                     # if the dict is empty after filtering, drop it
-                    return _drop
-                return res
-            # Sequence (list, tuple, etc); clean each element and drop empties/_drop
+                    return False, None
+                return True, res
+            # Sequence (list etc); clean each element and drop empties/_drop
             if _is_seq(x):
+                # print(f"Cleaning sequence: {x}")
                 # filter each element, preserve type
                 elements = []
                 for v in x:
-                    if isinstance(v, str) and v == REMOVED:  # drop list element marked REMOVE
-                        continue
-                    filtered_v = _filter_value(v)
-                    # if filtered_v is _drop:
-                    #     # remove this element
+                    keep_v, filtered_v = _filter_value(v)
+                    # if not keep_v:
+                    #     # drop this element
                     #     continue
-                    if _is_seq(filtered_v) and len(filtered_v) == 0:
-                        # remove this element if it's an empty list
-                        continue
+                    # drop empty sub-sequences
+                    # if _is_seq(filtered_v) and len(filtered_v) == 0:
+                    #     continue
                     # keep this element
                     elements.append(filtered_v)
-                return elements
+                if not elements:
+                    return False, None
+
+                return True, elements
             # # Scalar, str, None, etc
-            # if isinstance(x, Hashable) and x in REMOVED:
-            #     return _drop
-            return x
+            return True, x
 
-        def _filter_list(lst: list) -> list:
-            """
-            Filter a list and always return a (possible empty) list.
-            """
-            res = _filter_value(lst)
-            return list(res)
-
-        def _list_select_and_clean(row: list | str | None) -> list | str | None:
-            """
-            select one entry from a list context and clean it.
-            returns a cleaned value/list or `_drop` to indicate parent-key removal.
-            """
-            if isinstance(row, list):
-                cleaned = _filter_list(row)
-                return cleaned if cleaned else _drop  # empty list selection drops parent key
-            elif isinstance(row, str) and row == REMOVED:
-                return _drop  # selecting REMOVE from plain list drops parent key
-            else:
-                return row
+        def _select_from_list(row: list):
+            keep_v, cleaned = _filter_value(row)
+            if not keep_v:
+                return False, None
+            # if the selected (cleaned) value is the literal REMOVE,
+            # we must propagate it so the updater can pop the key.
+            if _is_removed_str(cleaned) and not _is_seq(cleaned):
+                return True, cleaned
+            return True, cleaned
 
         result = {}
         for key, value in nested_dict.items():
             # nested dictionary (Mapping)
             if isinstance(value, dict):
                 tmp = self._extract_run_specific_params(value, indx, total_exps)
-                cleaned = _filter_value(tmp)
-                if cleaned is not _drop:
+                keep_v, cleaned = _filter_value(tmp)
+                if keep_v:
                     result[key] = cleaned
-            # list or list of lists (Sequence)
-            elif isinstance(value, list):
+                continue
+
+            # list or list of dicts/lists (Sequence)
+            if isinstance(value, list):
                 # if it's a list of dicts (e.g., for submodels in `config.yaml` in OM2)
                 if value and all(isinstance(i, dict) for i in value):
-                    # process each dict in the list for the given column indx
-                    tmp = [self._extract_run_specific_params(i, indx, total_exps) for i in value]
-                    result[key] = tmp[0] if all(x == tmp[0] for x in tmp) else tmp
-                # if it's a list of lists
-                elif value and all(isinstance(i, list) for i in value):
+                    # print(value)
+                    outer_len = len(value)
+                    cleaned_items = []
+                    for item in value:
+                        item_params = self._extract_run_specific_params(item, indx, total_exps)
+                        keep_v, item_clean = _filter_value(item_params)
+                        if keep_v:
+                            cleaned_items.append(item_clean)
+                    if not cleaned_items:
+                        continue
+
+                    if outer_len == 1:
+                        sel = cleaned_items[0]
+                    elif outer_len == total_exps:
+                        sel = cleaned_items[indx]
+                    else:
+                        raise ValueError(
+                            f"For key '{key}', expected outer list-of-dicts length 1 or {total_exps}, got {outer_len}"
+                        )
+                    result[key] = sel
+                    continue
+
+                # list of lists
+                if value and all(isinstance(i, list) for i in value):
                     outer_len = len(value)
                     if outer_len == 1:
-                        sel = _list_select_and_clean(value[0])
+                        # broadcasting an inner inventory
+                        inner = value[0]
+
+                        # if inner is empty, drop the parent key
+                        if isinstance(inner, list) and len(inner) == 0:
+                            continue
+
+                        if all(isinstance(d, Mapping) for d in inner):
+                            # recurse for each dict
+                            items = []
+                            for d in inner:
+                                items.append(self._extract_run_specific_params(d, indx, total_exps))
+                            result[key] = items
+                            continue
+                        keep_v, sel = _select_from_list(inner)
                     elif outer_len == total_exps:
-                        sel = _list_select_and_clean(value[indx])
+                        keep_v, sel = _select_from_list(value[indx])
                     else:
                         raise ValueError(
                             f"For key '{key}', expected outer list-of-lists length 1 or {total_exps}, got {outer_len}"
                         )
-                    if sel is not _drop:
+                    if keep_v:
                         result[key] = sel
+                    # else drop parent key
+                    continue
+
+                # Plain list: if it has one element or all elements are identical, broadcast that element.
+                if len(value) == 1 or (len(value) > 1 and all(i == value[0] for i in value)):
+                    keep_v, sel = _select_from_list(value[0])
                 else:
-                    # Plain list: if it has one element or all elements are identical, broadcast that element.
-                    if len(value) == 1 or (len(value) > 1 and all(i == value[0] for i in value)):
-                        sel = _list_select_and_clean(value[0])
-                    else:
-                        if len(value) != total_exps:
-                            raise ValueError(
-                                f"For key '{key}', the inner list length is {len(value)}, but the "
-                                f"total experiment count is {total_exps}"
-                            )
-                        sel = _list_select_and_clean(value[indx])
-                    if sel is not _drop:
-                        result[key] = sel
+                    if len(value) != total_exps:
+                        raise ValueError(
+                            f"For key '{key}', the inner list length is {len(value)}, but the "
+                            f"total experiment count is {total_exps}"
+                        )
+                    keep_v, sel = _select_from_list(value[indx])
+                if keep_v:
+                    result[key] = sel
+                # else drop parent key
+                continue
+
             # Scalar, string, etc so return as is
-            else:
-                result[key] = value
+            result[key] = value
         return result
 
     def _setup_branch(self, expt_def: ExperimentDefinition, local_branches: dict) -> None:

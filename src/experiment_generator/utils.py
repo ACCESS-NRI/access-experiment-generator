@@ -72,11 +72,23 @@ def update_config_entries(base: dict, change: dict, pop_key: bool = True) -> Non
     for k, v in change.items():
         if isinstance(v, Mapping) and isinstance(base.get(k), Mapping):
             update_config_entries(base[k], v, pop_key=pop_key)
+            if pop_key and isinstance(base[k], Mapping) and not base[k]:
+                base.pop(k, None)
             continue
 
         cleaned = _clean_removes({k: v}, pop_key=pop_key)
 
         if k in cleaned:
-            base[k] = cleaned[k]
+            val = cleaned[k]
+            if pop_key:
+                # if isinstance(val, Mapping) and not val:
+                #     # special case: cleaned to empty mapping and pop_key=True -> remove key
+                #     base.pop(k, None)
+                #     continue
+                if isinstance(val, Sequence) and not isinstance(val, str) and len(val) == 0:
+                    # special case: cleaned to empty sequence and pop_key=True -> remove key
+                    base.pop(k, None)
+                    continue
+            base[k] = val
         else:
             base.pop(k, None)

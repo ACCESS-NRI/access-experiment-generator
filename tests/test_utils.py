@@ -137,9 +137,9 @@ def test_clean_removes_sets_none_when_pop_key_false_nested_mapping_replacement()
     assert base == {"outer": {"a": None, "b": 2}}
 
 
-def test_update_config_entries_list_of_mappings_becoming_empty_results_in_empty_list():
+def test_update_config_entries_list_of_mappings_becoming_empty_results():
     """
-    Ensures elements that clean to empty mappings are dropped, potentially leaving an empty list.
+    Ensures elements that clean to empty mappings are dropped, not leaving an empty list.
     """
     base = {"outer": {"lst": ["unchanged"]}}  # ensure we truly overwrite with cleaned list
 
@@ -154,7 +154,8 @@ def test_update_config_entries_list_of_mappings_becoming_empty_results_in_empty_
 
     update_config_entries(base, changes)
 
-    assert base["outer"]["lst"] == []
+    # assert "lst" not in base["outer"]  # cleaned list should be dropped entirely
+    assert base == {}
 
 
 def test_update_config_entries_mixed_nested_lists_and_scalars_clean_correctly():

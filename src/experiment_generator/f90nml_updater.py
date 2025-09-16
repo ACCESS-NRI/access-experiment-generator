@@ -11,6 +11,7 @@ from pathlib import Path
 import numpy as np
 import f90nml
 import re
+from .common_var import _is_removed_str
 
 
 class F90NamelistUpdater:
@@ -48,20 +49,24 @@ class F90NamelistUpdater:
 
             if "turning_angle" in group_value:
                 turning_angle = group_value.pop("turning_angle")
-                if turning_angle == "REMOVE" or turning_angle is None:
+                if _is_removed_str(turning_angle):
                     nml_all.setdefault(group_name, {}).pop("turning_angle", None)
                     continue
 
                 if target_file.endswith(("cice_in.nml", "ice_in")):
-                    tmp = np.radians(turning_angle)
-                    cosw = np.cos(tmp)
-                    sinw = np.sin(tmp)
+                    if turning_angle is None:
+                        # Preserve None: do not alter existing values, do not delete.
+                        pass
+                    else:
+                        tmp = np.radians(turning_angle)
+                        cosw = np.cos(tmp)
+                        sinw = np.sin(tmp)
 
-                    if "dynamics_nml" not in nml_all:
-                        nml_all["dynamics_nml"] = {}
+                        if "dynamics_nml" not in nml_all:
+                            nml_all["dynamics_nml"] = {}
 
-                    nml_all["dynamics_nml"]["cosw"] = cosw
-                    nml_all["dynamics_nml"]["sinw"] = sinw
+                        nml_all["dynamics_nml"]["cosw"] = cosw
+                        nml_all["dynamics_nml"]["sinw"] = sinw
 
             # Ensure the groupname exists
             if group_name not in nml_all:
@@ -69,7 +74,7 @@ class F90NamelistUpdater:
 
             # Update or remove variables
             for var, value in group_value.items():
-                if value == "REMOVE" or value is None:
+                if _is_removed_str(value):
                     nml_all[group_name].pop(var, None)
                 else:
                     nml_all[group_name][var] = value

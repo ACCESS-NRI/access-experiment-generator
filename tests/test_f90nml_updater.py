@@ -36,7 +36,8 @@ def test_update_nml_params_remove(tmp_path):
     # set value to None
     updater.update_nml_params({"grp": {"inner": None}}, nml_file.name)
     parsed = f90nml.read(nml_file)
-    assert "inner" not in parsed["grp"]
+    assert "inner" in parsed["grp"]
+    assert parsed["grp"]["inner"] == "None"  # f90nml saw the literal string
 
     # set value to string `REMOVE`
     updater.update_nml_params({"grp": {"inner": 2}}, nml_file.name)
@@ -74,7 +75,8 @@ def test_turning_angle_none_skips_processing(tmp_path):
     updater.update_nml_params({"grp": {"turning_angle": None}}, nml_file.name)
 
     parsed = f90nml.read(nml_file)
-    assert "turning_angle" not in parsed["grp"]
+    assert "turning_angle" in parsed["grp"]
+    assert parsed["grp"]["turning_angle"] == 45.0  # unchanged
     assert "dynamics_nml" not in parsed
 
 
@@ -142,3 +144,22 @@ def test_format_nml_params_exact_varname_match(tmp_path):
     assert lines[1].strip() == "! days = 99"
     assert lines[2].strip() == "days = 31"
     assert lines[3].strip() == "days_to_increment = 5"
+
+
+def test_turning_angle_remove_deletes(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    # put turning_angle in the file to start with
+    nml_file = repo / "ice_in"
+    nml_file.write_text("&grp\n    turning_angle = 45.\n/\n")
+
+    updater = F90NamelistUpdater(repo)
+    # now request deletion
+    updater.update_nml_params({"grp": {"turning_angle": "REMOVE"}}, nml_file.name)
+
+    parsed = f90nml.read(nml_file)
+    # turning_angle should be gone
+    assert "turning_angle" not in parsed["grp"]
+    # and because we passed "REMOVE", we don't write cos/sin anywhere
+    assert "dynamics_nml" not in parsed

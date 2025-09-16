@@ -8,6 +8,20 @@ required = ["type", "dimension", "value", "calendar", "comment"]
 allowed_types = {"scaling", "offset", "separable"}
 
 
+def _unwrap_broadcast(v, key=None):
+    """
+    Unwrap typical extractor shapes:
+      - [scalar] -> scalar
+      - [[a,b]] -> [a,b]  (only for dimension/value)
+    """
+    if isinstance(v, list) and len(v) == 1:
+        inner = v[0]
+        if key in ("dimension", "value") and isinstance(inner, list):
+            return inner
+        return inner
+    return v
+
+
 class Om2ForcingUpdater:
     """
     A utility class for updating OM2 forcing files, e.g., `forcing.json`
@@ -68,28 +82,35 @@ class Om2ForcingUpdater:
         # accept dict -> wrap it to list[dict]
         if isinstance(perts, dict):
             perts = [perts]
-            updates["perturbations"] = perts
-
-        # accept list[dict]
-        elif isinstance(perts, list) and all(isinstance(pert, dict) for pert in perts):
-            pass
+        elif isinstance(perts, list):
+            # must be list[dict]
+            if not all(isinstance(pert, dict) for pert in perts):
+                raise TypeError(f"-- forcing.json '{fieldname}': 'perturbations' must be a dict or list of dicts")
         else:
             raise TypeError(f"-- forcing.json '{fieldname}': 'perturbations' must be a dict or list of dicts")
 
-        def _is_to_remove(pert: dict) -> bool:
-            # explicit delete marker on type
-            t_ = pert.get("type", None)
+        # cleaned is list of dicts
+        cleaned = []
+        for p in perts:
+            q = dict(p)
+            for k in required:
+                if k in q:
+                    q[k] = _unwrap_broadcast(q[k], k)
+            t_ = q.get("type")
+
+            # skip if REMOVED
             if isinstance(t_, str) and t_ == REMOVED:
-                return True
+                continue
 
-            # missing/invalid type
-            if t_ is None or not isinstance(t_, str) or t_ not in allowed_types:
-                return True
+            # drop invalid type
+            if not isinstance(t_, str) or t_ not in allowed_types:
+                warnings.warn(
+                    f"-- forcing.json '{fieldname}': perturbation with invalid type '{t_}' found; skipping.",
+                    UserWarning,
+                )
+                continue
+            cleaned.append(q)
 
-            # all required keys are marked for removal
-            return all(isinstance(pert.get(k), str) and pert.get(k) == REMOVED for k in required)
-
-        cleaned = [p for p in perts if not _is_to_remove(p)]
         if not cleaned:
             warnings.warn(
                 f"-- forcing.json: all perturbations for field '{fieldname}' are marked for removal; "

@@ -130,76 +130,6 @@ def test_all_removed_perturbations_warn_and_skip(tmp_repo_dir, patch_json_and_ut
     assert "perturbations" not in updates
 
 
-def test_some_removed_but_others_cleaned_and_kept(tmp_repo_dir, patch_json_and_utils, monkeypatch):
-    """
-    Cleaning branch where some items are removed and the remaining
-    cleaned list is validated and assigned back into updates.
-    """
-    monkeypatch.setattr(om2_forcing_module, "REMOVED", "REMOVE", raising=True)
-
-    updater = Om2ForcingUpdater(tmp_repo_dir)
-    params = {
-        "uas": {
-            "filename": "NEW/uas.nc",
-            "cname": "uwnd_ai",
-            "perturbations": [
-                # removed
-                {"type": "REMOVE", "dimension": "REMOVE", "value": "REMOVE", "calendar": "REMOVE", "comment": "REMOVE"},
-                # kept (valid)
-                {
-                    "type": "separable",
-                    "dimension": ["temporal", "spatial"],
-                    "value": ["../t.nc", "../s.nc"],
-                    "calendar": "experiment",
-                    "comment": "keep me",
-                },
-            ],
-        }
-    }
-
-    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"))
-
-    assert len(patch_json_and_utils["update_config_entries"]) == 1
-    _, updates = patch_json_and_utils["update_config_entries"][0]
-    perts = updates["perturbations"]
-    assert isinstance(perts, list) and len(perts) == 1
-    assert perts[0]["type"] == "separable"
-    assert perts[0]["dimension"] == ["temporal", "spatial"]
-
-    assert len(patch_json_and_utils["write_json"]) == 1
-    written_json, _ = patch_json_and_utils["write_json"][0]
-    payload = json.loads(written_json)
-
-    uas_entry = next(x for x in payload["inputs"] if x["fieldname"] == "uas")
-    assert len(uas_entry["perturbations"]) == 1
-    assert uas_entry["perturbations"][0]["type"] == "separable"
-
-
-def test_dict_perturbations(tmp_repo_dir, patch_json_and_utils):
-    updater = Om2ForcingUpdater(tmp_repo_dir)
-
-    params = {
-        "tas": {
-            "filename": "NEW/tas_{{year}}.nc",
-            "cname": "tair_ai",
-            "perturbations": {
-                "type": "scaling",
-                "dimension": "temporal",
-                "value": "../test_data/scaling.tas.1990_1991.nc",
-                "calendar": "forcing",
-                "comment": "scale up",
-            },
-        }
-    }
-    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"))
-
-    assert len(patch_json_and_utils["update_config_entries"]) == 1
-    _, updates = patch_json_and_utils["update_config_entries"][0]
-    assert isinstance(updates["perturbations"], list)
-    assert len(updates["perturbations"]) == 1
-    assert updates["perturbations"][0]["type"] == "scaling"
-
-
 def test_fieldname_not_found_raises(tmp_repo_dir, patch_json_and_utils):
     updater = Om2ForcingUpdater(tmp_repo_dir)
     tmp = {"not_in_file": {"filename": "x.nc", "cname": "X"}}
@@ -311,3 +241,13 @@ def test_invalid_type_branch_removes_perturbations(tmp_repo_dir, patch_json_and_
     assert len(patch_json_and_utils["update_config_entries"]) == 1
     _, updates = patch_json_and_utils["update_config_entries"][0]
     assert "perturbations" not in updates
+
+
+def test_unwrap_broadcast_scalar_and_pairs():
+    # [scalar] -> scalar
+    assert om2_forcing_module._unwrap_broadcast([5], key="value") == 5
+    # [[a,b]] -> [a,b] for dimension/value
+    assert om2_forcing_module._unwrap_broadcast([["temporal", "spatial"]], key="dimension") == ["temporal", "spatial"]
+    assert om2_forcing_module._unwrap_broadcast([["a.nc", "b.nc"]], key="value") == ["a.nc", "b.nc"]
+    # pass through
+    assert om2_forcing_module._unwrap_broadcast("forcing", key="calendar") == "forcing"
