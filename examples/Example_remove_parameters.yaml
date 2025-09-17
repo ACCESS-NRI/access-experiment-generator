@@ -1,9 +1,14 @@
 # Experiment Configuration File
-# This is an example to demonstrate how to remove parameters
-# There are three different ways to remove parameters:
-# 1. using [REMOVE]
-# 2. using [~]
-# 3. using [null]
+# This file sets up parameters for both the control and perturbation experiments.
+# Adjust the settings below as needed for your environment and model.
+#
+# NOTE: This file is for demonstration purposes only.
+# It shows how to mark parameters for removal or for being set to None.
+# The parameter choices below are not scientifically meaningful!
+#
+# Removal rules:
+# - Use 'REMOVE' (as a literal string) to prune a key or element.
+# - Use '~', 'null' or leave the value blank, to explicitly set a parameter to None (kept in config).
 
 model_type: access-om3 # Specify the model ("access-om2", "access-om3", "access-esm1.5", or "access-esm1.6")
 repository_url: git@github.com:ACCESS-NRI/access-om3-configs.git
@@ -14,26 +19,124 @@ repository_directory: MC_25km_jra_ryf # Local directory name for the central rep
 control_branch_name: ctrl
 
 Control_Experiment:
+  # Demonstrates parameter removal and setting to None for the control branch.
+  #
+  # Example: in `MOM_input`, `USE_RIGID_SEA_ICE` is removed,
+  # while `INIT_LAYERS_FROM_Z_FILE` is set to None.
+  # In `config.yaml`, `exe` is kept with no value and `input` is removed.
+  MOM_input:
+    Z_INIT_REMAP_GENERAL: # Explicitly sets this to None (kept in config)
+    NUM_DIAG_COORDS: 3
+    SEA_ICE_RIGID_MASS: 200
+    USE_RIGID_SEA_ICE: REMOVE # Removes this parameter
+  
+  config.yaml:
+    manifest:
+      reproduce:
+        exe:
+        input: REMOVE # Removes this parameter
+    metadata: 
+      enable: false
 
 Perturbation_Experiment:
-    Parameter_block1:
-        branches:
-            - perturb_1
-        MOM_input:
-            AUTO_IO_LAYOUT_FAC:
-                - REMOVE
-            INIT_LAYERS_FROM_Z_FILE:
-                - ~
-            Z_INIT_ALE_REMAPPING:
-                - null
-        ice_in:
-            thermo_nml:
-                dsdt_slow_mode:
-                    - REMOVE
-            shortwave_nml:
-                ahmax:
-                    - ~
-        nuopc.runconfig:
-            DRIVER_attributes:
-                pio_blocksize:
-                    - null
+  # Shows how to remove or null parameters for perturbation branches.
+
+  # 1. Simple scalar parameters
+  # Examples:
+  # - In `MOM_input`, remove `AUTO_IO_LAYOUT_FAC`, set `INIT_LAYERS_FROM_Z_FILE`
+  #   and `Z_INIT_ALE_REMAPPING` to None.
+  # - In `ice_in` and `nuopc.runconfig`, remove or null other keys.
+  Parameter_block1:
+    branches:
+      - perturb_1a
+      - perturb_2a
+    MOM_input:
+      AUTO_IO_LAYOUT_FAC: REMOVE # Removes this parameter
+      INIT_LAYERS_FROM_Z_FILE: ~ # Explicitly sets this to None (kept in config)
+      Z_INIT_ALE_REMAPPING: null # Explicitly sets this to None (kept in config)
+    ice_in:
+      thermo_nml:
+        dsdt_slow_mode: REMOVE # Removes this parameter
+      shortwave_nml:
+        ahmax: ~ # Explicitly sets to None
+    nuopc.runconfig:
+      DRIVER_attributes:
+        pio_blocksize: null # Explicitly sets to None
+
+  # 2. list parameters
+  # Remove `AUTO_IO_LAYOUT_FAC` only for `perturb_2b`.
+  Parameter_block2:
+    branches:
+      - perturb_1b
+      - perturb_2b
+    MOM_input:
+      AUTO_IO_LAYOUT_FAC:
+        - 2
+        - REMOVE # Removes this parameter
+
+  # 3. List of lists / dicts
+  # Example: in `config.yaml`,
+  #   - For `perturb_2c` (atmosphere): remove `ncpus` and `input`.
+  #   - For `perturb_1c` (ocean): remove `ncpus` and `input`.
+  Parameter_block3:
+    branches:
+      - perturb_1c
+      - perturb_2c
+    config.yaml:
+      submodels:
+        - - name: atmosphere
+            model: um
+            ncpus:
+              - 208
+              - REMOVE
+            exe: um_hg3.exe
+            input:
+              - - /g/data/vk83/prerelease/configurations/inputs/access-esm1p6/modern/pre-industrial/atmosphere/aerosol/global.N96/2025.06.04/OCFF_1850_cmip7.anc
+                - /g/data/vk83/prerelease/configurations/inputs/access-esm1p6/modern/pre-industrial/atmosphere/aerosol/global.N96/2025.06.04/BC_1850_cmip7.anc
+              - REMOVE
+          - name: ocean
+            model: mom
+            ncpus:
+              - REMOVE
+              - 392
+            exe: mom5_access_cm 
+            input:
+              - REMOVE
+              - - /g/data/vk83/configurations/inputs/access-esm1p5/modern/share/ocean/biogeochemistry/global.1deg/2020.05.19/dust.nc
+                - /g/data/vk83/configurations/inputs/access-esm1p5/modern/share/ocean/biogeochemistry/global.1deg/2020.05.19/ocmip2_press_monthly_om1p5_bc.nc
+
+  # 4. Dict of dicts
+  # Example: in `diag_table`,
+  # - Remove `daily scalar timeseries` and `daily 2D fields` for all branches.
+  # - Keep `daily scalar timeseries2`, but for `perturb_2d` exclude `file_name`.
+  Parameter_block4:
+    branches:
+      - perturb_1d
+      - perturb_2d
+
+    diagnostic_profiles/source_yaml_files/diag_table_standard_source.yaml:
+      diag_table:
+        - 'daily scalar timeseries2':
+            defaults:
+              file_name_dimension: scalar
+              file_name:
+                - - file_name_prefix
+                  - file_name_dimension
+                  - output_freq
+                  - '':
+                      - output_freq_units
+                  - reduction_method
+                  - file_name_date
+                - REMOVE # Removes this entire `file_name` entry for perturb_2d
+              output_freq_units: days
+              reduction_method: snap
+              packing: 1
+            
+            fields:
+              - soga: # for perturb_1d
+                thetaoga: # for perturb_1d
+              - total_wfo: # for perturb_2d
+                total_evs: # for perturb_2d
+
+          'daily scalar timeseries': REMOVE # Removes this entire entry for all branches
+          'daily 2D fields': REMOVE # Removes this entire entry for all branches
