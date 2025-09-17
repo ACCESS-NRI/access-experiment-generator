@@ -32,7 +32,7 @@ class Mom6InputUpdater:
         raw_lines, base_params = read_mom_input(nml_path)
 
         # Update the parameters
-        # Note: This will remove keys with value None or "REMOVE"
+        # Note: This will remove keys with value "REMOVE" only
         update_config_entries(base_params, param_dict, pop_key=True)
 
         # Write the updated parameters back to the MOM6 input file

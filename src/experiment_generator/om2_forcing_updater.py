@@ -2,7 +2,10 @@ from pathlib import Path
 from .tmp_parser.json_parser import read_json, write_json
 from .utils import update_config_entries
 import warnings
-from .common_var import REMOVED
+from .common_var import _is_removed_str, REMOVED
+
+required = ["type", "dimension", "value", "calendar", "comment"]
+allowed_types = {"scaling", "offset", "separable", REMOVED}
 
 
 class Om2ForcingUpdater:
@@ -65,24 +68,32 @@ class Om2ForcingUpdater:
         # accept dict -> wrap it to list[dict]
         if isinstance(perts, dict):
             perts = [perts]
-            updates["perturbations"] = perts
-
-        # accept list[dict]
-        elif isinstance(perts, list) and all(isinstance(pert, dict) for pert in perts):
-            pass
+        elif isinstance(perts, list):
+            # must be list[dict]
+            if not all(isinstance(pert, dict) for pert in perts):
+                raise TypeError(f"-- forcing.json '{fieldname}': 'perturbations' must be a dict or list of dicts")
         else:
             raise TypeError(f"-- forcing.json '{fieldname}': 'perturbations' must be a dict or list of dicts")
 
-        required = ["type", "dimension", "value", "calendar", "comment"]
+        # cleaned is list of dicts
+        cleaned = []
+        for p in perts:
+            q = dict(p)
+            t_ = q.get("type")
 
-        def _is_to_remove(pert: dict) -> bool:
-            if all(pert.get(k) in REMOVED for k in required):
-                return True
-            if pert.get("type") in REMOVED:
-                return True
-            return False
+            # skip if REMOVED
+            if _is_removed_str(t_):
+                continue
 
-        cleaned = [p for p in perts if not _is_to_remove(p)]
+            # drop invalid type
+            if not isinstance(t_, str) or t_ not in allowed_types:
+                raise ValueError(
+                    f"-- forcing.json '{fieldname}': perturbation has invalid type '{t_}'. "
+                    f"Allowed types: {sorted(allowed_types)}"
+                )
+
+            cleaned.append(q)
+
         if not cleaned:
             warnings.warn(
                 f"-- forcing.json: all perturbations for field '{fieldname}' are marked for removal; "
@@ -105,7 +116,7 @@ class Om2ForcingUpdater:
         """
         Validate a single perturbation dict.
         """
-        if pert["type"] not in {"scaling", "offset", "separable"}:
+        if pert["type"] not in allowed_types:
             raise ValueError(f"Invalid perturbation type: {pert['type']}")
 
         dim = pert["dimension"]

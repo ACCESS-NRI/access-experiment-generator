@@ -26,6 +26,18 @@ def checkout_recorder(patch_git, monkeypatch):
     return calls
 
 
+def test_manage_control_expt_without_control_warn_skip(tmp_repo_dir, indata, patch_git):
+    """
+    Test that manage_control_expt skips if control branch is not set.
+    """
+    expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
+
+    with pytest.warns(UserWarning):
+        expt.manage_control_expt()
+
+    assert patch_git.commits == []
+
+
 def test_manage_perturb_expt_warns_no_perturbation_block(tmp_repo_dir, indata, patch_git):
     """
     Test that manage_perturb_expt raises a warning if no perturbation block is provided.
@@ -82,7 +94,11 @@ def test_apply_updates_with_correct_updaters(tmp_repo_dir, patch_updaters, indat
             "atmosphere/forcing.json": {
                 "tas": {
                     "perturbations": [
-                        {"type": "REMOVE", "dimension": "temporal", "value": "test_data/temporal.RYF.rsds.1990_1991.nc"}
+                        {
+                            "type": "scaling",
+                            "dimension": "temporal",
+                            "value": "test_data/temporal.RYF.rsds.1990_1991.nc",
+                        }
                     ]
                 }
             },
@@ -108,7 +124,7 @@ def test_apply_updates_with_correct_updaters(tmp_repo_dir, patch_updaters, indat
         {
             "tas": {
                 "perturbations": [
-                    {"type": "REMOVE", "dimension": "temporal", "value": "test_data/temporal.RYF.rsds.1990_1991.nc"}
+                    {"type": "scaling", "dimension": "temporal", "value": "test_data/temporal.RYF.rsds.1990_1991.nc"}
                 ]
             }
         },
@@ -118,13 +134,15 @@ def test_apply_updates_with_correct_updaters(tmp_repo_dir, patch_updaters, indat
 
 def test_manage_control_expt_applies_updates_and_commits(tmp_repo_dir, indata, patch_git):
     patch_git.repo.branches = [DummyBranch(indata["control_branch_name"])]
-    patch_git.repo.index = DummyIndex(["config.yaml", "ice_in"])
+    patch_git.repo.index = DummyIndex(
+        ["config.yaml", "ice_in", "MOM_input", "nuopc.runseq", "nuopc.runconfig", "atmosphere/forcing.json"]
+    )
 
     control_block = {
-        "config.yaml": {"queue": "normal"},
+        "config.yaml": {"queue": "express"},
         "ice_in": {"diagfreq": 720},
-        "MOM_input": {"DT": 1800.0},
-        "nuopc.runseq": {"cpl_dt": 3600},
+        "MOM_input": {"DT": 3600.0},
+        "nuopc.runseq": {"cpl_dt": 20},
         "nuopc.runconfig": {"ALLCOMP_attributes": {"ATM_model": "satm"}},
         "atmosphere/forcing.json": {"tas": {"perturbations": [{"type": "REMOVE"}]}},
     }
@@ -136,20 +154,8 @@ def test_manage_control_expt_applies_updates_and_commits(tmp_repo_dir, indata, p
 
     assert len(patch_git.commits) == 1
     msg, files = patch_git.commits[0]
-    assert files == ["config.yaml", "ice_in"]
+    assert files == ["config.yaml", "ice_in", "MOM_input", "nuopc.runseq", "nuopc.runconfig", "atmosphere/forcing.json"]
     assert "Updated control files" in msg
-
-
-def test_manage_control_expt_without_control_warn_skip(tmp_repo_dir, indata, patch_git):
-    """
-    Test that manage_control_expt skips if control branch is not set.
-    """
-    expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
-
-    with pytest.warns(UserWarning):
-        expt.manage_control_expt()
-
-    assert patch_git.commits == []
 
 
 def test_manage_perturb_expt_creat_branches_applies_updates_and_commits(
@@ -200,48 +206,80 @@ def test_manage_perturb_expt_creat_branches_applies_updates_and_commits(
         # broadcast single list value across branches
         ({"queue": ["normal"]}, 0, 2, {"queue": "normal"}),
         ({"queue": ["normal"]}, 1, 2, {"queue": "normal"}),
-        # nested dict
-        ({"nested": {"param": ["value1", "value2"]}}, 0, 2, {"nested": {"param": "value1"}}),
-        ({"nested": {"param": ["value1", "value2"]}}, 1, 2, {"nested": {"param": "value2"}}),
-        # list of dicts: same value for all dicts
-        ({"modules": [{"name": ["A", "B"]}, {"name": ["A", "B"]}]}, 0, 2, {"modules": {"name": "A"}}),
-        ({"modules": [{"name": ["A", "B"]}, {"name": ["A", "B"]}]}, 1, 2, {"modules": {"name": "B"}}),
-        # list of dicts: different values for each dict
-        ({"modules": [{"name": ["A", "B"]}, {"name": ["C", "D"]}]}, 0, 2, {"modules": [{"name": "A"}, {"name": "C"}]}),
-        ({"modules": [{"name": ["A", "B"]}, {"name": ["C", "D"]}]}, 1, 2, {"modules": [{"name": "B"}, {"name": "D"}]}),
-        # pick by index when list length == total_exps
-        ({"queue": ["normal", "express"]}, 0, 2, {"queue": "normal"}),
-        ({"queue": ["normal", "express"]}, 1, 2, {"queue": "express"}),
-        # list of lists - broadcast inner list when outer_len == 1
-        ({"queue": [["normal"]]}, 0, 2, {"queue": ["normal"]}),
-        ({"queue": [["normal"]]}, 1, 2, {"queue": ["normal"]}),
-        # list of lists - pick by index when outer_len == total_exps
-        ({"modules": [["A"], ["B"]]}, 0, 2, {"modules": ["A"]}),
-        ({"modules": [["A"], ["B"]]}, 1, 2, {"modules": ["B"]}),
-        # select None should return None (row in REMOVED)
-        ({"modules": ["A", "REMOVE"]}, 0, 2, {"modules": "A"}),
-        ({"modules": ["A", "REMOVE"]}, 1, 2, {"modules": None}),
-        # scalar - broadcast across branches
+        # broadcast single plain value across branches
         ({"cpl_dt": 3600}, 0, 2, {"cpl_dt": 3600}),
         ({"cpl_dt": 3600}, 1, 2, {"cpl_dt": 3600}),
+        # Two 1-layer nested dict for two branches
+        ({"metadata": {"enable": [True, False]}}, 0, 2, {"metadata": {"enable": True}}),
+        ({"metadata": {"enable": [True, False]}}, 1, 2, {"metadata": {"enable": False}}),
+        # Two 2-layers nested dict for two branches
+        ({"manifest": {"reproduce": {"exe": ["exe1", "exe2"]}}}, 0, 2, {"manifest": {"reproduce": {"exe": "exe1"}}}),
+        ({"manifest": {"reproduce": {"exe": ["exe1", "exe2"]}}}, 1, 2, {"manifest": {"reproduce": {"exe": "exe2"}}}),
+        # broadcast single nested dict for two branches
+        ({"metadata": {"enable": [True]}}, 0, 2, {"metadata": {"enable": True}}),
+        ({"metadata": {"enable": [True]}}, 1, 2, {"metadata": {"enable": True}}),
+        # broadcast single 2-layers nested dict for two branches
+        ({"manifest": {"reproduce": {"exe": ["exe1"]}}}, 0, 2, {"manifest": {"reproduce": {"exe": "exe1"}}}),
+        ({"manifest": {"reproduce": {"exe": ["exe1"]}}}, 1, 2, {"manifest": {"reproduce": {"exe": "exe1"}}}),
+        # list of lists - single one inner list: broadcast inner list
+        ({"modules": {"use": [[["/g/data/vk83/modules"]]]}}, 0, 2, {"modules": {"use": [["/g/data/vk83/modules"]]}}),
+        ({"modules": {"use": [[["/g/data/vk83/modules"]]]}}, 1, 2, {"modules": {"use": [["/g/data/vk83/modules"]]}}),
+        # list of lists - single inner lists with 2 items: broadcast as above
+        ({"modules": {"load": [[["moduleA"], ["moduleB"]]]}}, 0, 2, {"modules": {"load": [["moduleA"], ["moduleB"]]}}),
+        ({"modules": {"load": [[["moduleA"], ["moduleB"]]]}}, 1, 2, {"modules": {"load": [["moduleA"], ["moduleB"]]}}),
+        # list of lists - two inner lists: pick by index
+        (
+            {"modules": {"load": [[["moduleA"], ["moduleB"]], [["moduleC"], ["moduleD"]]]}},
+            0,
+            2,
+            {"modules": {"load": [["moduleA"], ["moduleB"]]}},
+        ),
+        (
+            {"modules": {"load": [[["moduleA"], ["moduleB"]], [["moduleC"], ["moduleD"]]]}},
+            1,
+            2,
+            {"modules": {"load": [["moduleC"], ["moduleD"]]}},
+        ),
+        # _filter_value: _is_remove_str(x)
+        ({"queue": "REMOVE"}, 0, 2, {"queue": "REMOVE"}),
+        ({"queue": "REMOVE"}, 1, 2, {"queue": "REMOVE"}),
+        ({"queue": ["REMOVE"]}, 0, 1, {"queue": "REMOVE"}),
+        ({"queue": ["REMOVE"]}, 0, 2, {"queue": "REMOVE"}),
+        # list of empty lists: collapse to empty dict
+        ({"queue": [[]]}, 0, 2, {}),
+        ({"queue": [[], {"keep": 1}]}, 1, 2, {"queue": {"keep": 1}}),
+        ({"modules": {"child": {"a": [[], []]}}}, 0, 2, {}),
+        ({"outer": [{"a": [[], []]}, {"b": [[], []]}]}, 0, 2, {}),
+        # ({"platform": [{"nodesize": [104, 104]}, {"nodesize": [104, 104]}]}, 0, 2, {"platform": {"nodesize": 104}}),
+        (
+            {
+                "diag_table": [
+                    {"A": {"fields": [{"temp_branch1": {None}, "salt_branch1": {None}}, {"temp_branch2": {None}}]}}
+                ]
+            },
+            1,
+            2,
+            {"diag_table": {"A": {"fields": {"temp_branch2": {None}}}}},
+        ),
+        (
+            {"submodels": [[{"input": ["1.nc", "2.nc"]}, {"input": ["1.nc", "2.nc"]}]]},
+            1,
+            2,
+            {"submodels": [{"input": "2.nc"}, {"input": "2.nc"}]},
+        ),
+        (
+            {"submodels": [[{"input": ["1.nc", "2.nc"]}, {"input": ["3.nc", "4.nc"]}]]},
+            1,
+            2,
+            {"submodels": [{"input": "2.nc"}, {"input": "4.nc"}]},
+        ),
     ],
 )
 def test_extract_run_specific_params_rules(tmp_repo_dir, indata, param_dict, indx, total, expected):
+    # param_dict is the value of a single file
     expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
     result = expt._extract_run_specific_params(param_dict, indx, total)
     assert result == expected
-
-
-def test_extract_run_specific_params_raises_on_invalid_list_length(tmp_repo_dir, indata):
-    expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
-    with pytest.raises(ValueError):
-        expt._extract_run_specific_params({"queue": ["normal", "express"]}, 0, 3)
-
-
-def test_extract_run_specific_params_raises_on_invalid_outerlen(tmp_repo_dir, indata):
-    expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
-    with pytest.raises(ValueError):
-        expt._extract_run_specific_params({"modules": [["A"], ["B"]]}, 0, 3)
 
 
 def test_setup_branch_is_new_branch_false(tmp_repo_dir, indata, patch_git, checkout_recorder):
@@ -262,42 +300,30 @@ def test_setup_branch_is_new_branch_false(tmp_repo_dir, indata, patch_git, check
     assert call["start_point"] == "perturb_1"
 
 
-def test_setup_branch_is_new_branch_true(tmp_repo_dir, indata, patch_git, checkout_recorder):
-    patch_git.repo.branches = []
+def test_extract_run_specific_params_raises_on_invalid_list_length(tmp_repo_dir, indata):
     expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
-    expt_def = ed(
-        block_name="Parameter_block1",
-        branch_name="perturb_1",
-        file_params={},
-    )
-
-    expt._setup_branch(expt_def, patch_git.local_branches_dict())
-
-    assert len(checkout_recorder) == 1
-    call = checkout_recorder[0]
-    assert call["branch_name"] == "perturb_1"
-    assert call["is_new_branch"] is True
-    assert call["start_point"] == indata["control_branch_name"]
+    with pytest.raises(ValueError):
+        # 2 items in list, but total_exps=3
+        expt._extract_run_specific_params({"queue": ["normal", "express"]}, 0, 3)
 
 
-def test_mapping_drops_key_when_child_cleans_to_empty_list(tmp_repo_dir, indata):
+def test_extract_run_specific_params_raises_on_invalid_outerlen(tmp_repo_dir, indata):
     expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
-    param_dict = {
-        "outer": {
-            "lst": [
-                {"inner1": ["REMOVE", "REMOVE"]},
-                {"inner2": ["REMOVE", "REMOVE"]},
-            ]
-        }
-    }
-    # NB: total_exps can be anything > 1, since outer list len is 1 so it gets broadcast
-    res = expt._extract_run_specific_params(param_dict, indx=0, total_exps=3)
-    assert res == {}
+    with pytest.raises(ValueError):
+        # outer list len 2, but total_exps=3
+        expt._extract_run_specific_params({"modules": [["A"], ["B"]]}, 0, 3)
 
 
-def test_sequence_drops_element_when_item_becomes_empty_list(tmp_repo_dir, indata):
+def test_extract_run_specific_params_raises_on_list_of_dicts_inconsistent_outer_len_total_exps(tmp_repo_dir, indata):
     expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
-    param_dict = {"outer": [[["REMOVE"], "A"]]}
-    # NB: total_exps can be anything > 1, since outer list len is 1 so it gets broadcast
-    res = expt._extract_run_specific_params(param_dict, indx=0, total_exps=3)
-    assert res == {"outer": ["A"]}
+    with pytest.raises(ValueError):
+        # outer list len 3, but total_exps=2
+        expt._extract_run_specific_params(
+            {
+                "diag_table": [
+                    {"A": {"fields": [{"temp_branch1": {None}}, {"temp_branch2": {None}}, {"temp_branch3": {None}}]}}
+                ]
+            },
+            0,
+            2,
+        )

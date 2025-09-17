@@ -1,6 +1,8 @@
+import os
 import warnings
-from pathlib import Path
 from dataclasses import dataclass
+from pathlib import Path
+from collections.abc import Mapping, Sequence  # , Hashable
 from payu.branch import checkout_branch
 from .base_experiment import BaseExperiment
 from payu.git_utils import GitRepository
@@ -10,9 +12,7 @@ from .nuopc_runconfig_updater import NuopcRunConfigUpdater
 from .mom6_input_updater import Mom6InputUpdater
 from .nuopc_runseq_updater import NuopcRunseqUpdater
 from .om2_forcing_updater import Om2ForcingUpdater
-from .common_var import REMOVED, BRANCH_KEY
-from collections.abc import Mapping, Sequence, Hashable
-import os
+from .common_var import BRANCH_KEY, _is_removed_str
 
 
 @dataclass
@@ -182,155 +182,161 @@ class PerturbationExperiment(BaseExperiment):
     def _extract_run_specific_params(self, nested_dict: dict, indx: int, total_exps: int) -> dict:
         """
         Recursively extract parameters for a specific run index from nested structures.
-        It handles (nested) dicts, plain lists, lists of lists, and lists of dicts,
-        also handles broadcasting, filtering, and index-based selection.
-        Args:
-            nested_dict (dict): The nested dictionary containing parameters.
-            indx (int): The index of the current expt run.
-            total_exps (int): Total number of experiments.
+        It handles,
+         - nested Mappings (dict-like),
+         - plain lists, lists of lists, and lists of dicts,
+         - broadcasting single values across all branches,
+         - removing explicit delete markers (only the literal REMOVED string).
 
         Rules:
-         - (nested) dict: recursively extract for each key.
-         - list of dicts: extract for each dict, if all dicts are the same, return a single dict;
+         - Mapping (dict): recursively extract for each key.
+         - list of dicts:
+            - outer_len == 1; treats as a broadcast, unwraps the inner dict and applies it to all branches.
+            - outer_len == total_exps; extracts by index.
+            - else -> error (len must equal total_exps)
          - list of lists:
-            - if outer length == 1: treats as a broadcast, unwraps the inner list and applies it to all branches.
+            - if outer length == 1
+                - if inner is empty, drops the parent key.
+                - if inner is list of dicts, recurses for each dict.
+                - else applies _select_from_list to the inner list.
             - if outer length == total_exps: extracts by index.
+            - else -> error (len must equal total_exps)
          - plain list (scalars, strings):
             - if outer length == 1: broadcasts the single value to all branches.
             - if outer length == total_exps: extracts by index.
-            - else -> pick by index (len must equal total_exps)
+            - else -> error (len must equal total_exps)
          - other scalar / strings: broadcasts the single value to all branches.
 
-        Broadcasting:
-         - Broadcasting allows a single item to apply to all branches, avoiding duplication.
-            - Example:
-            ```yaml
-            modules:
-                load:
-                - [access-om3]
-            ```
-            The above interpreted as `load: [access-om3]` for all branches
-
-        -  Filtering:
-         - Filtering cleans lists by removing `None`, `'REMOVE'`, or `~`.
-            - Example:
-            ```yaml
-            modules:
-                load:
-                - [access-om3]
-                - [~]
-            ```
-            For the 2nd branch, `load` is filtered to empty, so the `load` key is removed.
+         -  Filtering:
+            - The literal delete marker `REMOVE` is preserved by the selector (so the updater can drop keys).
+            - After cleaning, empty lists and empty dicts are dropped (parent key omitted).
+            - `None`/null values are preserved as-is (not removed).
         """
-
-        class _Drop:
-            # just a marker for removing unwanted keys
-            pass
-
-        _drop = _Drop()
 
         def _is_seq(x) -> bool:
             return isinstance(x, Sequence) and not isinstance(x, str)
 
         def _filter_value(x):
             """
-            Recursively apply removal rules to any shape; return cleaned_value or _drop marker.
+            Clean values; return (keep: bool, cleaned).
             """
-            # Mapping (dict, CommentedMap, etc)
-            if isinstance(x, Mapping):
-                res = type(x)()  # preserves types suchas CommentedMap, etc
-                for k, v in x.items():
-                    filtered_v = _filter_value(v)
-                    if filtered_v is _drop:
-                        # remove this key
-                        continue
-                    if _is_seq(filtered_v) and len(filtered_v) == 0:
-                        # remove this key if the filtered value is an empty list
-                        continue
-                    # keep this key
-                    res[k] = filtered_v
+            # Preserve explicit delete marker as a value (not dropped here)
+            if _is_removed_str(x):
+                return True, x
 
-                if not res:
-                    # if the dict is empty after filtering, drop it
-                    return _drop
-                return res
-            # Sequence (list, tuple, etc) but not str; clean each element; drop elements that are _drop or empty lists
+            # Mapping (dict, CommentedMap, etc); clean values and prune empties
+            if isinstance(x, Mapping):
+                res = type(x)()
+                for k, v in x.items():
+                    keep_v, filtered_v = _filter_value(v)
+                    res[k] = filtered_v
+                return (False, None) if not res else (True, res)
+
+            # Sequence (list etc); clean each element and drop empties/_drop
             if _is_seq(x):
-                # filter each element, preserve type
                 elements = []
                 for v in x:
-                    filtered_v = _filter_value(v)
-                    if filtered_v is _drop:
-                        # remove this element
-                        continue
-                    if _is_seq(filtered_v) and len(filtered_v) == 0:
-                        # remove this element if it's an empty list
-                        continue
-                    # keep this element
+                    keep_v, filtered_v = _filter_value(v)
                     elements.append(filtered_v)
-                return elements
-            # Scalar, str, None, etc
-            if isinstance(x, Hashable) and x in REMOVED:
-                return _drop
-            return x
+                return (False, None) if not elements else (True, elements)
 
-        def _filter_list(lst: list) -> list:
-            """
-            Recursively remove None or 'REMOVE' values from lists/dicts.
-            """
-            res = _filter_value(lst)
-            return list(res) if _is_seq(res) else [res]
+            # # Scalar, str, None, etc
+            return True, x
 
-        def _list_select_and_clean(row: list | str | None) -> list | str | None:
-            if isinstance(row, list):
-                cleaned = _filter_list(row)
-                return cleaned if cleaned else None
-            elif row in REMOVED:
-                return None
-            else:
-                return row
+        def _select_from_list(row: list):
+            """
+            Clean a list and select the appropriate element for this run index.
+            """
+            keep_v, cleaned = _filter_value(row)
+            if not keep_v:
+                return False, None
+            # Propagate literal REMOVE (non-sequence) upwards
+            if _is_removed_str(cleaned) and not _is_seq(cleaned):
+                return True, cleaned
+            return True, cleaned
 
         result = {}
         for key, value in nested_dict.items():
             # nested dictionary (Mapping)
-            if isinstance(value, dict):
-                tmp = self._extract_run_specific_params(value, indx, total_exps)
-                cleaned = _filter_value(tmp)
-                if cleaned is not _drop:
+            if isinstance(value, Mapping):
+                keep_v, cleaned = _filter_value(self._extract_run_specific_params(value, indx, total_exps))
+                if keep_v:
                     result[key] = cleaned
-            # list or list of lists (Sequence)
-            elif isinstance(value, list):
-                # if it's a list of dicts (e.g., for submodels in `config.yaml` in OM2)
-                if value and all(isinstance(i, dict) for i in value):
-                    # process each dict in the list for the given column indx
-                    tmp = [self._extract_run_specific_params(i, indx, total_exps) for i in value]
-                    result[key] = tmp[0] if all(x == tmp[0] for x in tmp) else tmp
+                continue
 
-                # if it's a list of lists
-                elif value and all(isinstance(i, list) for i in value):
+            # list or list of dicts/lists (Sequence)
+            if isinstance(value, list):
+                # if it's a list of dicts (e.g., for submodels in `config.yaml` in OM2)
+                if value and all(isinstance(i, Mapping) for i in value):
+                    outer_len = len(value)
+
+                    # Clean each item first (so empties fall out)
+                    cleaned_items = []
+                    for item in value:
+                        keep_v, item_clean = _filter_value(self._extract_run_specific_params(item, indx, total_exps))
+                        if keep_v:
+                            cleaned_items.append(item_clean)
+                    if not cleaned_items:
+                        continue
+
+                    if outer_len == 1:
+                        result[key] = cleaned_items[0]  # broadcast the single dict to all branches
+                    elif outer_len == total_exps:
+                        result[key] = cleaned_items[indx]  # select by index
+                    else:
+                        raise ValueError(
+                            f"For key '{key}', expected outer list-of-dicts length 1 or {total_exps}, got {outer_len}"
+                        )
+                    continue
+
+                # list of lists
+                if value and all(isinstance(i, list) for i in value):
                     outer_len = len(value)
                     if outer_len == 1:
-                        result[key] = _list_select_and_clean(value[0])
+                        # broadcasting an inner inventory
+                        inner = value[0]
+
+                        # if inner is empty, drop the parent key suchas queue: [[]]
+                        if isinstance(inner, list) and len(inner) == 0:
+                            continue
+
+                        if all(isinstance(d, Mapping) for d in inner):
+                            # recurse for each dict
+                            items = []
+                            for d in inner:
+                                items.append(self._extract_run_specific_params(d, indx, total_exps))
+                            result[key] = items
+                            continue
+                        # otherwise, treat as a plain list
+                        keep_v, sel = _select_from_list(inner)
                     elif outer_len == total_exps:
-                        result[key] = _list_select_and_clean(value[indx])
+                        keep_v, sel = _select_from_list(value[indx])
                     else:
                         raise ValueError(
                             f"For key '{key}', expected outer list-of-lists length 1 or {total_exps}, got {outer_len}"
                         )
+                    if keep_v:
+                        result[key] = sel
+                    # else drop parent key
+                    continue
+
+                # Plain list: if it has one element or all elements are identical, broadcast that element.
+                if len(value) == 1 or (len(value) > 1 and all(i == value[0] for i in value)):
+                    keep_v, sel = _select_from_list(value[0])
                 else:
-                    # Plain list: if it has one element or all elements are identical, broadcast that element.
-                    if len(value) == 1 or (len(value) > 1 and all(i == value[0] for i in value)):
-                        result[key] = _list_select_and_clean(value[0])
-                    else:
-                        if len(value) != total_exps:
-                            raise ValueError(
-                                f"For key '{key}', the inner list length is {len(value)}, but the "
-                                f"total experiment count is {total_exps}"
-                            )
-                        result[key] = _list_select_and_clean(value[indx])
+                    if len(value) != total_exps:
+                        raise ValueError(
+                            f"For key '{key}', the inner list length is {len(value)}, but the "
+                            f"total experiment count is {total_exps}"
+                        )
+                    keep_v, sel = _select_from_list(value[indx])
+                if keep_v:
+                    result[key] = sel
+                # else drop parent key
+                continue
+
             # Scalar, string, etc so return as is
-            else:
-                result[key] = value
+            result[key] = value
         return result
 
     def _setup_branch(self, expt_def: ExperimentDefinition, local_branches: dict) -> None:
