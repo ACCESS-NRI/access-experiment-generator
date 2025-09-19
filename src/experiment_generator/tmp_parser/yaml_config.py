@@ -1,3 +1,9 @@
+"""
+A temporary parser for YAML format files.
+- `read_yaml`: Load a YAML file into a Python dictionary with preserved quotes.
+- `write_yaml`: Dump a Python dictionary back to a YAML file, maintaining format.
+"""
+
 import io
 import re
 import ruamel.yaml
