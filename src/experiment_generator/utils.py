@@ -10,7 +10,7 @@ This module provides helper functions
 """
 
 from collections.abc import Mapping, Sequence
-from .common_var import _is_removed_str, _is_preserved_str, is_seq
+from .common_var import _is_removed_str, _is_preserved_str, _is_seq
 
 
 def _strip_preserved(x):
@@ -41,7 +41,7 @@ def _strip_preserved(x):
         return True, out
 
     # sequence (non-str)
-    if is_seq(x):
+    if _is_seq(x):
         # whole-list PRESERVED
         if len(x) == 1 and _is_preserved_str(x[0]):
             return False, None
@@ -81,7 +81,7 @@ def _clean_removes(x, *, pop_key: bool) -> object:
         return out
 
     # Sequence (but not str): clean each item; drop REMOVED and items that become {}
-    if is_seq(x):
+    if _is_seq(x):
         out_seq = []
         for item in x:
             # drop literal REMOVED elements
