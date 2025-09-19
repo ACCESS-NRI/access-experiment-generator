@@ -3,7 +3,7 @@ from collections.abc import Sequence
 # Experiment specific attributes
 BRANCH_KEY = "branches"
 REMOVED = "REMOVE"
-RESERVED = "RESERVE"
+PRESERVED = "PRESERVE"
 
 
 def _is_removed_str(x) -> bool:
@@ -15,13 +15,13 @@ def _is_removed_str(x) -> bool:
     return isinstance(x, str) and x == REMOVED
 
 
-def _is_reserved_str(x) -> bool:
+def _is_preserved_str(x) -> bool:
     """
-    Check if a value is the explicit keep marker ("RESERVED").
+    Check if a value is the explicit keep marker ("PRESERVED").
 
-    Returns True if `x` is a string equal to RESERVED, otherwise False.
+    Returns True if `x` is a string equal to PRESERVED, otherwise False.
     """
-    return isinstance(x, str) and x == RESERVED
+    return isinstance(x, str) and x == PRESERVED
 
 
 def _is_seq(x) -> bool:
