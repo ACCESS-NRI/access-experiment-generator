@@ -34,7 +34,7 @@ def read_yaml(path: str):
         return ryaml.load(f)
 
 
-def write_yaml(data: dict, path: str) -> None:
+def write_yaml(data: dict, yaml_path: str) -> None:
     """
     Writes a dictionary to a YAML file while preserving formatting.
     """
