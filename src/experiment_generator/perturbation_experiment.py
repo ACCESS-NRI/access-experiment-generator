@@ -2,7 +2,7 @@ import os
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from collections.abc import Mapping, Sequence  # , Hashable
+from collections.abc import Mapping  # , Sequence  # , Hashable
 from payu.branch import checkout_branch
 from .base_experiment import BaseExperiment
 from payu.git_utils import GitRepository
@@ -12,7 +12,7 @@ from .nuopc_runconfig_updater import NuopcRunConfigUpdater
 from .mom6_input_updater import Mom6InputUpdater
 from .nuopc_runseq_updater import NuopcRunseqUpdater
 from .om2_forcing_updater import Om2ForcingUpdater
-from .common_var import BRANCH_KEY, _is_removed_str
+from .common_var import BRANCH_KEY, _is_removed_str, _is_preserved_str, _is_seq
 
 
 @dataclass
@@ -213,9 +213,6 @@ class PerturbationExperiment(BaseExperiment):
             - `None`/null values are preserved as-is (not removed).
         """
 
-        def _is_seq(x) -> bool:
-            return isinstance(x, Sequence) and not isinstance(x, str)
-
         def _filter_value(x):
             """
             Clean values; return (keep: bool, cleaned).
@@ -224,16 +221,23 @@ class PerturbationExperiment(BaseExperiment):
             if _is_removed_str(x):
                 return True, x
 
+            if _is_preserved_str(x):
+                return False, None
+
             # Mapping (dict, CommentedMap, etc); clean values and prune empties
             if isinstance(x, Mapping):
                 res = type(x)()
                 for k, v in x.items():
                     keep_v, filtered_v = _filter_value(v)
-                    res[k] = filtered_v
+                    if keep_v:
+                        res[k] = filtered_v
                 return (False, None) if not res else (True, res)
 
             # Sequence (list etc); clean each element and drop empties/_drop
             if _is_seq(x):
+                if len(x) == 1 and _is_preserved_str(x[0]):
+                    return False, None
+
                 elements = []
                 for v in x:
                     keep_v, filtered_v = _filter_value(v)
@@ -336,6 +340,8 @@ class PerturbationExperiment(BaseExperiment):
                 continue
 
             # Scalar, string, etc so return as is
+            if _is_preserved_str(value):
+                continue
             result[key] = value
         return result
 
