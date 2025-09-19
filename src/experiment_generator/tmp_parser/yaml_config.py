@@ -32,6 +32,9 @@ def read_yaml(path: str):
 
 
 def write_yaml(data: dict, path: str) -> None:
+    """
+    Writes a dictionary to a YAML file while preserving formatting.
+    """
     buffer = io.StringIO()
     ryaml.dump(data, buffer)
     txt = buffer.getvalue()
