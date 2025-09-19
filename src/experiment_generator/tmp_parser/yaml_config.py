@@ -26,7 +26,7 @@ _BLANK_BETWEEN_KEYS = re.compile(
 )
 
 
-def read_yaml(path: str):
+def read_yaml(yaml_path: str):
     """
     Reads a YAML file and returns a dictionary.
     """
