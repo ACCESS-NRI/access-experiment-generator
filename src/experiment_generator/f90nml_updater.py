@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 import f90nml
 import re
-from .common_var import _is_removed_str
+from .common_var import _is_removed_str, _is_preserved_str
 
 
 class F90NamelistUpdater:
@@ -76,8 +76,13 @@ class F90NamelistUpdater:
             for var, value in group_value.items():
                 if _is_removed_str(value):
                     nml_all[group_name].pop(var, None)
-                else:
-                    nml_all[group_name][var] = value
+                    continue
+                if _is_preserved_str(value):
+                    continue
+                if value is None:
+                    # Preserve None: do not alter existing values, do not delete.
+                    continue
+                nml_all[group_name][var] = value
 
         f90nml.write(nml_all, nml_tmp_path, force=True)
         nml_tmp_path.replace(nml_path)
