@@ -30,7 +30,7 @@ def read_yaml(path: str):
     """
     Reads a YAML file and returns a dictionary.
     """
-    with open(path, "r", encoding="utf-8") as f:
+    with open(yaml_path, "r", encoding="utf-8") as f:
         return ryaml.load(f)
 
 
