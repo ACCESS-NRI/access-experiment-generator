@@ -43,5 +43,5 @@ def write_yaml(data: dict, yaml_path: str) -> None:
     txt = buffer.getvalue()
     # collapse only blank lines between sibling mapping entries (all levels)
     txt = _BLANK_BETWEEN_KEYS.sub(r"\g<i>\g<k>\n", txt)
-    with open(path, "w", encoding="utf-8") as f:
+    with open(yaml_path, "w", encoding="utf-8") as f:
         f.write(txt)
