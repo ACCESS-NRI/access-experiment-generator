@@ -273,6 +273,25 @@ def test_manage_perturb_expt_creat_branches_applies_updates_and_commits(
             2,
             {"submodels": [{"input": "2.nc"}, {"input": "4.nc"}]},
         ),
+        # PRESERVED: skip changing this key
+        ({"queue": "PRESERVE"}, 0, 2, {}),
+        ({"queue": "PRESERVE"}, 1, 2, {}),
+        # single-item list [PRESERVE] -> skip key
+        # ({"queue2": ["PRESERVE"]}, 0, 2, {}),
+        # ({"queue2": ["PRESERVE"]}, 1, 2, {}),
+        ({"queue2": ["PRESERVE"]}, 0, 2, {"queue2": "PRESERVE"}),
+        ({"queue2": ["PRESERVE"]}, 1, 2, {"queue2": "PRESERVE"}),
+        # mapping whose only child is PRESERVE -> drop key
+        ({"outer": {"x": "PRESERVE"}}, 0, 2, {}),
+        ({"outer": {"x": "PRESERVE"}}, 1, 2, {}),
+        # list-of-dicts where all children become PRESERVE -> drop key
+        ({"diag_table": [{"A": "PRESERVE"}, {"B": "PRESERVE"}]}, 0, 2, {}),
+        ({"diag_table": [{"A": "PRESERVE"}, {"B": "PRESERVE"}]}, 1, 2, {}),
+        # sequence branch: inner list is [PRESERVE]
+        # ({"queue3": [["PRESERVE"]]}, 0, 2, {}),
+        # ({"queue3": [["PRESERVE"]]}, 1, 2, {}),
+        ({"queue3": [["PRESERVE"]]}, 0, 2, {"queue3": ["PRESERVE"]}),
+        ({"queue3": [["PRESERVE"]]}, 1, 2, {"queue3": ["PRESERVE"]}),
     ],
 )
 def test_extract_run_specific_params_rules(tmp_repo_dir, indata, param_dict, indx, total, expected):
