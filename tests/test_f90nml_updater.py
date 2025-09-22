@@ -46,25 +46,6 @@ def test_update_nml_params_remove(tmp_path):
     assert "inner" not in parsed["grp"]
 
 
-# @pytest.mark.parametrize("angle", [0, 30, 90])
-# def test_turning_angle_writes_cosw_sinw(tmp_path, angle):
-#     repo = tmp_path / "repo"
-#     repo.mkdir()
-
-#     nml_file = repo / "cice_in.nml"
-#     nml_file.write_text("&ice_nml\n /\n")
-
-#     updater = F90NamelistUpdater(repo)
-#     updater.update_nml_params({"ice_nml": {"turning_angle": angle}}, nml_file.name)
-
-#     parsed = f90nml.read(nml_file)
-
-#     rad = math.radians(angle)
-
-#     assert np.isclose(parsed["dynamics_nml"]["cosw"], math.cos(rad), atol=1e-12)
-#     assert np.isclose(parsed["dynamics_nml"]["sinw"], math.sin(rad), atol=1e-12)
-
-
 def test_group_created_and_vars_set(tmp_path):
     repo = tmp_path / "repo"
     repo.mkdir()
