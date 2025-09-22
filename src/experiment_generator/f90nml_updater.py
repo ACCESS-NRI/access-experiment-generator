@@ -47,26 +47,44 @@ class F90NamelistUpdater:
             if not isinstance(group_value, dict):
                 raise ValueError(f"Expected dict for {group_name}, got {type(group_value)}")
 
+            # Special handling for 'turning_angle'
+            # ref: https://github.com/aekiss/ensemble/blob/b27e4b7992683e4308bf630aa16da21730ccb11a/ensemble.py\
+            # #L63C77-L63C89
             if "turning_angle" in group_value:
-                turning_angle = group_value.pop("turning_angle")
-                if _is_removed_str(turning_angle):
-                    nml_all.setdefault(group_name, {}).pop("turning_angle", None)
-                    continue
+                turning_angle = group_value["turning_angle"]
 
-                if target_file.endswith(("cice_in.nml", "ice_in")):
-                    if turning_angle is None:
-                        # Preserve None: do not alter existing values, do not delete.
-                        pass
-                    else:
-                        tmp = np.radians(turning_angle)
-                        cosw = np.cos(tmp)
-                        sinw = np.sin(tmp)
+                # Only manage cos/sin and delete 'turning_angle' when it's in dynamics_nml
+                if group_name == "dynamics_nml":
+                    # remove turning_angle from dynamics_nml
+                    group_value.pop("turning_angle", None)
 
-                        if "dynamics_nml" not in nml_all:
-                            nml_all["dynamics_nml"] = {}
+                    # Only CICE namelists manage cosw/sinw
+                    if target_file.endswith(("cice_in.nml", "ice_in")):
+                        if _is_removed_str(turning_angle):
+                            # drop cos/sin
+                            if "dynamics_nml" in nml_all:
+                                nml_all["dynamics_nml"].pop("cosw", None)
+                                nml_all["dynamics_nml"].pop("sinw", None)
+                                if not nml_all["dynamics_nml"]:
+                                    nml_all.pop("dynamics_nml", None)
 
-                        nml_all["dynamics_nml"]["cosw"] = cosw
-                        nml_all["dynamics_nml"]["sinw"] = sinw
+                        elif _is_preserved_str(turning_angle) or turning_angle is None:
+                            dyn = nml_all.get("dynamics_nml", {})
+                            if "cosw" not in dyn and "sinw" not in dyn:
+                                raise ValueError(
+                                    "Cannot preserve turning_angle: no existing cosw and sinw found in `dynamics_nml`"
+                                )
+                        else:
+                            tmp = np.radians(turning_angle)
+                            cosw = np.cos(tmp)
+                            sinw = np.sin(tmp)
+                            nml_all.setdefault("dynamics_nml", {})
+                            nml_all["dynamics_nml"]["cosw"] = cosw
+                            nml_all["dynamics_nml"]["sinw"] = sinw
+                else:
+                    # turning_angle is in some other group -> do NOT touch cos/sin.
+                    # Leave it to the normal per-variable loop below (REMOVE / PRESERVE / None rules).
+                    pass
 
             # Ensure the groupname exists
             if group_name not in nml_all:
@@ -77,9 +95,7 @@ class F90NamelistUpdater:
                 if _is_removed_str(value):
                     nml_all[group_name].pop(var, None)
                     continue
-                if _is_preserved_str(value):
-                    continue
-                if value is None:
+                if _is_preserved_str(value) or value is None:
                     # Preserve None: do not alter existing values, do not delete.
                     continue
                 nml_all[group_name][var] = value
