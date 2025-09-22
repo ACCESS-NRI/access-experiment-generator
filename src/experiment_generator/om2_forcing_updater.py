@@ -2,10 +2,10 @@ from pathlib import Path
 from .tmp_parser.json_parser import read_json, write_json
 from .utils import update_config_entries
 import warnings
-from .common_var import _is_removed_str, REMOVED, _is_preserved_str
+from .common_var import _is_removed_str, _is_preserved_str, REMOVED, PRESERVED
 
 required = ["type", "dimension", "value", "calendar", "comment"]
-allowed_types = {"scaling", "offset", "separable", REMOVED}
+allowed_types = {"scaling", "offset", "separable", REMOVED, PRESERVED}
 
 
 class Om2ForcingUpdater:
