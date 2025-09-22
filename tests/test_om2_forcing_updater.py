@@ -240,3 +240,130 @@ def test_invalid_type_branch_removes_perturbations(tmp_repo_dir, patch_json_and_
 
     assert patch_json_and_utils["update_config_entries"] == []
     assert patch_json_and_utils["write_json"] == []
+
+
+def test_top_level_perturbations_preserved_scalar_is_dropped(tmp_repo_dir, patch_json_and_utils):
+    """
+    if _is_preserved_str(perts): pop 'perturbations'
+    """
+    updater = Om2ForcingUpdater(tmp_repo_dir)
+    params = {
+        "tas": {
+            "filename": "tas.nc",
+            "perturbations": "PRESERVE",
+        }
+    }
+    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"))
+
+    # ensure we merged without 'perturbations'
+    assert len(patch_json_and_utils["update_config_entries"]) == 1
+    _, updates = patch_json_and_utils["update_config_entries"][0]
+    assert "perturbations" not in updates
+    assert updates["filename"] == "tas.nc"
+
+
+def test_top_level_perturbations_preserved_singleton_list_is_dropped(tmp_repo_dir, patch_json_and_utils):
+    """
+    list with one PRESERVED element
+    """
+    updater = Om2ForcingUpdater(tmp_repo_dir)
+    params = {
+        "tas": {
+            "filename": "tas.nc",
+            "perturbations": ["PRESERVE"],
+        }
+    }
+    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"))
+    assert len(patch_json_and_utils["update_config_entries"]) == 1
+    _, updates = patch_json_and_utils["update_config_entries"][0]
+    assert "perturbations" not in updates
+    assert updates["filename"] == "tas.nc"
+
+
+def test_top_level_keys_marked_preserved_are_dropped_before_merge(tmp_repo_dir, patch_json_and_utils):
+    """
+    keys_to_drop = [k for k, v in updates.items() if _is_preserved_str(v)]
+    """
+    updater = Om2ForcingUpdater(tmp_repo_dir)
+    params = {
+        "tas": {
+            "filename": "PRESERVE",
+            "cname": "tair_ai",
+            "perturbations": {
+                "type": "scaling",
+                "dimension": "temporal",
+                "value": "../tas.nc",
+                "calendar": "forcing",
+                "comment": "x",
+            },
+        }
+    }
+    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"))
+    # ensure 'filename' key didn't get passed to the merger
+    _, updates = patch_json_and_utils["update_config_entries"][0]
+    assert "filename" not in updates
+    assert "perturbations" in updates
+
+
+def test_preprocess_perturbations_type_preserved_skips_that_entry(tmp_repo_dir, patch_json_and_utils):
+    """
+    if _is_preserved_str(t_): continue
+    Also ensures remaining valid perturbation is kept.
+    """
+    updater = Om2ForcingUpdater(tmp_repo_dir)
+    params = {
+        "tas": {
+            "perturbations": [
+                {
+                    "type": "PRESERVE",
+                    "dimension": "temporal",
+                    "value": "../tas.nc",
+                    "calendar": "forcing",
+                    "comment": "x",
+                },
+                {
+                    "type": "offset",  # kept
+                    "dimension": "spatial",
+                    "value": "../keep.nc",
+                    "calendar": "experiment",
+                    "comment": "keep",
+                },
+            ]
+        }
+    }
+    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"))
+    # exactly one perturbation survives and is passed to merger
+    _, updates = patch_json_and_utils["update_config_entries"][0]
+    perts = updates["perturbations"]
+    assert isinstance(perts, list) and len(perts) == 1
+    assert perts[0]["type"] == "offset"
+    assert perts[0]["dimension"] == "spatial"
+    assert perts[0]["calendar"] == "experiment"
+
+
+def test_preprocess_perturbations_inner_fields_preserved_are_dropped(tmp_repo_dir, patch_json_and_utils):
+    """
+    for k in list(q.keys()): dropping inner 'PRESERVE' fields inside each perturbation dict.
+    """
+    updater = Om2ForcingUpdater(tmp_repo_dir)
+    params = {
+        "tas": {
+            "perturbations": [
+                {
+                    "type": "scaling",
+                    "dimension": "temporal",
+                    "value": "../tas.nc",
+                    "calendar": "forcing",
+                    "comment": "PRESERVE",  # should be removed from dict
+                }
+            ]
+        }
+    }
+    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"))
+    _, updates = patch_json_and_utils["update_config_entries"][0]
+    (pert,) = updates["perturbations"]
+    assert "comment" not in pert  # dropped
+    # sanity: others remain
+    assert pert["type"] == "scaling"
+    assert pert["dimension"] == "temporal"
+    assert pert["calendar"] == "forcing"
