@@ -2,7 +2,7 @@ from pathlib import Path
 from .tmp_parser.json_parser import read_json, write_json
 from .utils import update_config_entries
 import warnings
-from .common_var import _is_removed_str, REMOVED
+from .common_var import _is_removed_str, REMOVED, _is_preserved_str
 
 required = ["type", "dimension", "value", "calendar", "comment"]
 allowed_types = {"scaling", "offset", "separable", REMOVED}
@@ -32,7 +32,19 @@ class Om2ForcingUpdater:
             base = file_read["inputs"][idx]
 
             if "perturbations" in updates:
-                self._preprocess_perturbations(fieldname, updates)
+                perts = updates.get("perturbations")
+                if _is_preserved_str(perts) or (
+                    isinstance(perts, list) and len(perts) == 1 and _is_preserved_str(perts[0])
+                ):
+                    # don't touch existing perts for this field
+                    updates.pop("perturbations", None)
+                else:
+                    self._preprocess_perturbations(fieldname, updates)
+
+            # Drop any top-level keys explicitly marked PRESERVE (do not change this key)
+            keys_to_drop = [k for k, v in updates.items() if _is_preserved_str(v)]
+            for k in keys_to_drop:
+                updates.pop(k, None)
 
             update_config_entries(base, updates)
 
@@ -84,6 +96,15 @@ class Om2ForcingUpdater:
             # skip if REMOVED
             if _is_removed_str(t_):
                 continue
+
+            # If type is PRESERVE -> keep existing perturbation at this index; skip
+            if _is_preserved_str(t_):
+                continue
+
+            # Drop any fields set to PRESERVE within this perturbation (leave those as-is on disk)
+            for k in list(q.keys()):
+                if _is_preserved_str(q[k]):
+                    q.pop(k, None)
 
             # drop invalid type
             if not isinstance(t_, str) or t_ not in allowed_types:
