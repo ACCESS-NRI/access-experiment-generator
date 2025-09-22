@@ -1,5 +1,5 @@
 from experiment_generator.utils import update_config_entries
-from experiment_generator.common_var import REMOVED
+from experiment_generator.common_var import REMOVED, PRESERVED
 
 
 def test_update_config_entries_basic_changes_with_pop_key():
@@ -177,3 +177,43 @@ def test_update_config_entries_mixed_nested_lists_and_scalars_clean_correctly():
     update_config_entries(base, changes)
 
     assert base == {"outer": {"values": [{"k": 3, "t": [4]}, 2]}}
+
+
+def test_update_config_entries_preserved_scalar_skips_change():
+    """
+    _strip_preserved: scalar PRESERVED -> should_apply=False (skip change).
+    """
+    base = {"a": 1}
+    changes = {"a": PRESERVED}
+    update_config_entries(base, changes)
+    assert base == {"a": 1}
+
+
+def test_update_config_entries_preserved_mapping_becomes_empty_skips_key():
+    """
+    _strip_preserved: mapping where all children are PRESERVED -> nothing left -> skip key.
+    """
+    base = {"outer": {"x": 1, "y": 2}}
+    changes = {"outer": {"x": PRESERVED, "y": PRESERVED}}
+    update_config_entries(base, changes)
+    assert base == {"outer": {"x": 1, "y": 2}}
+
+
+def test_update_config_entries_preserved_mapping_whole_mapping_skips_key2():
+    """
+    _strip_preserved: mapping when PRESERVED is applied to the whole mapping -> skip key.
+    """
+    base = {"outer": {"x": 1, "y": 2}}
+    changes = {"outer": PRESERVED}
+    update_config_entries(base, changes)
+    assert base == {"outer": {"x": 1, "y": 2}}
+
+
+def test_update_config_entries_preserved_whole_list_skips_key():
+    """
+    _strip_preserved: sequence with a single PRESERVED element -> skip updating this key.
+    """
+    base = {"lst": [0, 1]}
+    changes = {"lst": [PRESERVED]}
+    update_config_entries(base, changes)
+    assert base == {"lst": [0, 1]}
