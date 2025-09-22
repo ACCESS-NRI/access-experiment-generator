@@ -45,10 +45,6 @@ def _strip_preserved(x):
         # whole-list PRESERVED
         if len(x) == 1 and _is_preserved_str(x[0]):
             return False, None
-        # if any PRESERVED appears, be conservative: skip updating this key
-        if any(_is_preserved_str(v) for v in x):
-            return False, None
-        # otherwise pass through unchanged
         return True, x
 
     # everything else: apply as-is
