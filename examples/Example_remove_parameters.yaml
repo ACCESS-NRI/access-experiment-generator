@@ -10,7 +10,7 @@
 # - Use 'REMOVE' (as a literal string) to prune a key or element.
 # - Use '~', 'null' or leave the value blank, to explicitly set a parameter to None (kept in config).
 
-model_type: access-om3 # Specify the model ("access-om2", "access-om3", "access-esm1.5", or "access-esm1.6")
+model_type: access-om3 # available models can be checked via `payu list`
 repository_url: git@github.com:ACCESS-NRI/access-om3-configs.git
 start_point: "52bf0b6" # Control commit hash for new branches
 test_path: prototype-0.2.0-remove-parameters # All control and perturbation experiment repositories will be created here; can be relative, absolute or ~ (user-defined)
