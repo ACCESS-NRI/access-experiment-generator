@@ -13,6 +13,7 @@ from .mom6_input_updater import Mom6InputUpdater
 from .nuopc_runseq_updater import NuopcRunseqUpdater
 from .om2_forcing_updater import Om2ForcingUpdater
 from .common_var import BRANCH_KEY, _is_removed_str, _is_preserved_str, _is_seq
+from .utils import _strip_preserved
 
 
 @dataclass
@@ -58,6 +59,12 @@ class PerturbationExperiment(BaseExperiment):
         Apply a dict of `{filename: parameters}` to different config files.
         """
         for filename, params in file_params.items():
+            # TODO: this is temporary because f90nml_updater.update_nml_params does not use
+            # update_config_entries() yet. This will be fixed as long as access-parsers implements.
+            should_apply, params = _strip_preserved(params)
+            if not should_apply:
+                params = {}
+
             if filename.endswith("_in") or filename.endswith(".nml") or os.path.basename(filename) == "namelists":
                 self.f90namelistupdater.update_nml_params(params, filename)
             elif filename.endswith(".yaml"):
@@ -207,8 +214,14 @@ class PerturbationExperiment(BaseExperiment):
             - else -> error (len must equal total_exps)
          - other scalar / strings: broadcasts the single value to all branches.
 
+         - Special markers:
+            -  REMOVE: keep it in the result so that later updaters can drop the key.
+            -  PRESERVE: also keep it in the result so that later stripping
+              (via _strip_preserved or update_config_entries) decides whether to
+              keep or drop it.
+            - None or null etc: preserved as-is (not removed).
+
          -  Filtering:
-            - The literal delete marker `REMOVE` is preserved by the selector (so the updater can drop keys).
             - After cleaning, empty lists and empty dicts are dropped (parent key omitted).
             - `None`/null values are preserved as-is (not removed).
         """
@@ -222,7 +235,8 @@ class PerturbationExperiment(BaseExperiment):
                 return True, x
 
             if _is_preserved_str(x):
-                return False, None
+                # keep marker so list merger can interpret it at element level
+                return True, x
 
             # Mapping (dict, CommentedMap, etc); clean values and prune empties
             if isinstance(x, Mapping):
@@ -236,7 +250,7 @@ class PerturbationExperiment(BaseExperiment):
             # Sequence (list etc); clean each element and drop empties/_drop
             if _is_seq(x):
                 if len(x) == 1 and _is_preserved_str(x[0]):
-                    return False, None
+                    return True, x
 
                 elements = []
                 for v in x:
@@ -327,6 +341,8 @@ class PerturbationExperiment(BaseExperiment):
                 # Plain list: if it has one element or all elements are identical, broadcast that element.
                 if len(value) == 1 or (len(value) > 1 and all(i == value[0] for i in value)):
                     keep_v, sel = _select_from_list(value[0])
+                    if keep_v:
+                        result[key] = sel
                 else:
                     if len(value) != total_exps:
                         raise ValueError(
@@ -335,13 +351,19 @@ class PerturbationExperiment(BaseExperiment):
                         )
                     keep_v, sel = _select_from_list(value[indx])
                 if keep_v:
-                    result[key] = sel
+                    if isinstance(sel, str) and _is_preserved_str(sel):
+                        pass
+                    else:
+                        result[key] = sel
                 # else drop parent key
                 continue
 
-            # Scalar, string, etc so return as is
-            if _is_preserved_str(value):
+            if _is_removed_str(value) or _is_preserved_str(value):
+                # PRESERVE or REMOVE at scalar level so keep literal marker
+                result[key] = value
                 continue
+
+            # Scalar, string, etc so return as is
             result[key] = value
         return result
 
