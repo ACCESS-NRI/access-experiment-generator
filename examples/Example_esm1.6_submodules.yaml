@@ -2,7 +2,7 @@
 # This file sets up parameters for both the control and perturbation experiments.
 # Adjust the settings below as needed for your environment and model.
 
-model_type: access-esm1.6 # Specify the model ("access-om2", "access-om3", "access-esm1.5", or "access-esm1.6")
+model_type: access-esm1.6  # available models can be checked via `payu list`
 repository_url: git@github.com:ACCESS-NRI/access-esm1.6-configs.git
 start_point: "61b5e1c" # Control commit hash for new branches
 test_path: prototype-0.3.0-esm1.6-submodules # All control and perturbation experiment repositories will be created here; can be relative, absolute or ~ (user-defined)
