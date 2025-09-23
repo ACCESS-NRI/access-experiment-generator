@@ -273,25 +273,21 @@ def test_manage_perturb_expt_creat_branches_applies_updates_and_commits(
             2,
             {"submodels": [{"input": "2.nc"}, {"input": "4.nc"}]},
         ),
-        # PRESERVED: skip changing this key
-        ({"queue": "PRESERVE"}, 0, 2, {}),
-        ({"queue": "PRESERVE"}, 1, 2, {}),
-        # single-item list [PRESERVE] -> skip key
-        ({"queue2": ["PRESERVE"]}, 0, 2, {}),
-        ({"queue2": ["PRESERVE"]}, 1, 2, {}),
-        # ({"queue2": ["PRESERVE"]}, 0, 2, {"queue2": "PRESERVE"}),
-        # ({"queue2": ["PRESERVE"]}, 1, 2, {"queue2": "PRESERVE"}),
-        # mapping whose only child is PRESERVE -> drop key
-        ({"outer": {"x": "PRESERVE"}}, 0, 2, {}),
-        ({"outer": {"x": "PRESERVE"}}, 1, 2, {}),
-        # list-of-dicts where all children become PRESERVE -> drop key
-        ({"diag_table": [{"A": "PRESERVE"}, {"B": "PRESERVE"}]}, 0, 2, {}),
-        ({"diag_table": [{"A": "PRESERVE"}, {"B": "PRESERVE"}]}, 1, 2, {}),
+        # PRESERVED
+        ({"queue": "PRESERVE"}, 0, 2, {"queue": "PRESERVE"}),
+        ({"queue": "PRESERVE"}, 1, 2, {"queue": "PRESERVE"}),
+        # single-item list [PRESERVE]
+        ({"queue2": ["PRESERVE"]}, 0, 2, {"queue2": "PRESERVE"}),
+        ({"queue2": ["PRESERVE"]}, 1, 2, {"queue2": "PRESERVE"}),
+        # mapping whose only child is PRESERVE
+        ({"outer": {"x": "PRESERVE"}}, 0, 2, {"outer": {"x": "PRESERVE"}}),
+        ({"outer": {"x": "PRESERVE"}}, 1, 2, {"outer": {"x": "PRESERVE"}}),
+        # list-of-dicts where all children become PRESERVE
+        ({"diag_table": [{"A": "PRESERVE"}, {"B": "PRESERVE"}]}, 0, 2, {"diag_table": {"A": "PRESERVE"}}),
+        ({"diag_table": [{"A": "PRESERVE"}, {"B": "PRESERVE"}]}, 1, 2, {"diag_table": {"B": "PRESERVE"}}),
         # sequence branch: inner list is [PRESERVE]
-        ({"queue3": [["PRESERVE"]]}, 0, 2, {}),
-        ({"queue3": [["PRESERVE"]]}, 1, 2, {}),
-        # ({"queue3": [["PRESERVE"]]}, 0, 2, {"queue3": ["PRESERVE"]}),
-        # ({"queue3": [["PRESERVE"]]}, 1, 2, {"queue3": ["PRESERVE"]}),
+        ({"queue3": [["PRESERVE"]]}, 0, 2, {"queue3": ["PRESERVE"]}),
+        ({"queue3": [["PRESERVE"]]}, 1, 2, {"queue3": ["PRESERVE"]}),
     ],
 )
 def test_extract_run_specific_params_rules(tmp_repo_dir, indata, param_dict, indx, total, expected):
@@ -346,3 +342,16 @@ def test_extract_run_specific_params_raises_on_list_of_dicts_inconsistent_outer_
             0,
             2,
         )
+
+
+def test_apply_updates_strips_preserve_top_level_sets_empty_dict(tmp_repo_dir, indata, patch_updaters):
+    # TODO: remove this test when f90nml_updater.update_nml_params uses update_config_entries()
+    # after access-parsers implements it.
+    (f90_recorder, *_rest) = patch_updaters
+
+    expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
+    expt._apply_updates({"ice/cice_in.nml": {"setup_nml": "PRESERVE"}})
+
+    assert f90_recorder.calls == [
+        ("update_nml_params", {}, "ice/cice_in.nml"),
+    ]
