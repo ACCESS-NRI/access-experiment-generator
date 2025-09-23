@@ -1,5 +1,5 @@
 from experiment_generator.utils import update_config_entries
-from experiment_generator.common_var import REMOVED
+from experiment_generator.common_var import REMOVED, PRESERVED
 
 
 def test_update_config_entries_basic_changes_with_pop_key():
@@ -177,3 +177,177 @@ def test_update_config_entries_mixed_nested_lists_and_scalars_clean_correctly():
     update_config_entries(base, changes)
 
     assert base == {"outer": {"values": [{"k": 3, "t": [4]}, 2]}}
+
+
+def test_update_config_entries_preserved_scalar_skips_change():
+    """
+    _strip_preserved: scalar PRESERVED -> should_apply=False (skip change).
+    """
+    base = {"a": 1}
+    changes = {"a": PRESERVED}
+    update_config_entries(base, changes)
+    assert base == {"a": 1}
+
+
+def test_update_config_entries_preserved_mapping_becomes_empty_skips_key():
+    """
+    _strip_preserved: mapping where all children are PRESERVED -> nothing left -> skip key.
+    """
+    base = {"outer": {"x": 1, "y": 2}}
+    changes = {"outer": {"x": PRESERVED, "y": PRESERVED}}
+    update_config_entries(base, changes)
+    assert base == {"outer": {"x": 1, "y": 2}}
+
+
+def test_update_config_entries_preserved_mapping_whole_mapping_skips_key2():
+    """
+    _strip_preserved: mapping when PRESERVED is applied to the whole mapping -> skip key.
+    """
+    base = {"outer": {"x": 1, "y": 2}}
+    changes = {"outer": PRESERVED}
+    update_config_entries(base, changes)
+    assert base == {"outer": {"x": 1, "y": 2}}
+
+
+def test_update_config_entries_preserved_whole_list_skips_key():
+    """
+    _strip_preserved: sequence with a single PRESERVED element -> skip updating this key.
+    """
+    base = {"lst": [0, 1]}
+    changes = {"lst": [PRESERVED]}
+    update_config_entries(base, changes)
+    assert base == {"lst": [0, 1]}
+
+
+def test_update_config_entries_preserve_keeps_existing_replacing_and_appends():
+    """
+    List merging is positional: each change[i] replaces or merges with base[i].
+    """
+    base = {"lst": [10, 12]}
+    changes = {"lst": [PRESERVED, 1, 2]}
+    update_config_entries(base, changes)
+    assert base == {"lst": [10, 1, 2]}
+
+
+def test_update_config_entries_preserve_keeps_existing_replacing_and_appends2():
+    """
+    List merging is positional: each change[i] replaces or merges with base[i].
+    """
+    base = {"lst": [10, 12]}
+    changes = {"lst": [1, 2]}
+    update_config_entries(base, changes)
+    assert base == {"lst": [1, 2]}
+
+
+def test_merge_lists_positional_all_remove_returns_none_triggers_key_drop():
+    # change list has only REMOVE then _merge_lists_positional returns None
+    base = {"k": [1, 2, 3]}
+    change = {"k": [REMOVED]}
+    update_config_entries(base, change, pop_key=True)
+    assert "k" not in base
+
+
+def test_merge_lists_positional_shorter_change_list():
+    # change list is shorter than base list
+    base = {"k": [1, 2, 3, 4]}
+    change = {"k": [REMOVED, PRESERVED, 5]}
+    update_config_entries(base, change, pop_key=True)
+    # remove the first ele, preserve the 2nd ele, change the 3rd to 5, keep the 4th as-is
+    assert base == {"k": [2, 5, 4]}
+
+
+def test_merge_lists_positional_greater_change_list():
+    # change list is shorter than base list
+    base = {"k": [1, 2, 3]}
+    change = {"k": [REMOVED, PRESERVED, 5, 6, 7]}
+    update_config_entries(base, change, pop_key=True)
+    # remove the first ele, preserve the 2nd ele, change the 3rd to 5, append 6 and 7
+    assert base == {"k": [2, 5, 6, 7]}
+
+
+def test_list_slot_mapping_merge_kept_when_non_empty():
+    """
+    Both sides are mappings at an index; merging produces non-empty -> slot kept.
+    """
+    base = {"lst": [{"a": 1}, {"b": 2}]}
+    # change merges into index 0, adds 'x': 10
+    changes = {"lst": [{"x": 10}]}
+    update_config_entries(base, changes, pop_key=True)
+    assert base == {"lst": [{"a": 1, "x": 10}, {"b": 2}]}
+
+
+def test_list_slot_mapping_merge_drops_slot_when_empty_and_pop_key_true():
+    """
+    Both sides are mappings; change deletes the only key -> merged becomes {}.
+    With pop_key=True, empty mapping slot is dropped.
+    """
+    base = {"lst": [{"a": 1}, {"keep": 1}]}
+    # At index 0, remove key 'a' -> merged becomes {}
+    changes = {"lst": [{"a": REMOVED}]}
+    update_config_entries(base, changes, pop_key=True)
+    # Index 0 dropped entirely; the remaining element shifts left
+    assert base == {"lst": [{"keep": 1}]}
+
+
+def test_list_slot_mapping_merge_nested_and_preserve_noop():
+    """
+    Ensure PRESERVE inside the mapping leaves existing base content untouched.
+    """
+    base = {"lst": [{"a": {"k": 1}}, {"b": 2}]}
+    # At index 0, try to change 'a' but mark it as PRESERVE -> no change, then add 'c'
+    changes = {"lst": [{"a": PRESERVED, "c": 3}]}
+    update_config_entries(base, changes, pop_key=True)
+    assert base == {"lst": [{"a": {"k": 1}, "c": 3}, {"b": 2}]}
+
+
+def test_recursive_list_merge_basic_replace():
+    """
+    Both sides have a list at index 0 -> recurse and replace inner scalars positionally.
+    """
+    base = {"lst": [[10, 20, 30], "unchanged"]}
+    # only inner first two replaced; third kept
+    changes = {"lst": [[1, 2], "PRESERVE"]}
+    update_config_entries(base, changes, pop_key=True)
+    assert base == {"lst": [[1, 2, 30], "unchanged"]}
+
+
+def test_drop_key_when_cleaned_to_empty_sequence_and_pop_key_true_scalar_base():
+    base = {"lst": "list", "keep": 42}
+    changes = {"lst": []}  # change is empty list and base is scalar
+    update_config_entries(base, changes, pop_key=True)
+    assert base == {"keep": 42}  # lst is dropped
+
+
+# def test_empty_mapping_in_change_keeps_existing_slot():
+#     base = {"lst": [{"a": 1}, {"b": 2}]}
+#     # empty mapping also means PRESERVE
+#     changes = {"lst": [{}, {"b": 3}]}
+#     update_config_entries(base, changes, pop_key=True)
+#     assert base == {"lst": [{"a": 1}, {"b": 3}]}
+
+# def test_empty_mapping_for_missing_slot_does_not_append():
+#     base = {"lst": [1]}
+#     # {} at i=0 keeps base[0]; {} at i=2 with no base
+#     changes = {"lst": [{}, 2, {}]}
+#     update_config_entries(base, changes, pop_key=True)
+#     assert base == {"lst": [1, 2]}
+
+# def test_empty_mapping_when_base_is_empty_skips_cleanly():
+#     base = {"lst": []}
+#     changes = {"lst": [{}, {"x": 1}]}
+#     update_config_entries(base, changes, pop_key=True)
+#     assert base == {"lst": [{"x": 1}]}
+
+# def test_empty_mapping_keeps_nested_types_unchanged():
+#     base = {"lst": [{"k": 1}, "keep", [1, 2]]}
+#     changes = {"lst": [{}, {"repl": True}, {}]}
+#     update_config_entries(base, changes, pop_key=True)
+#     # {} at i=0 keeps {"k":1}; {} at i=2 keeps [1,2]
+#     assert base == {"lst": [{"k": 1}, {"repl": True}, [1, 2]]}
+
+# def test_double_empty_mapping_beyond_base_is_ignored():
+#     base = {"lst": ["only"]}
+#      # i=0 keeps "only"; i=1,2 have no base so skipped
+#     changes = {"lst": [{}, {}, {}]}
+#     update_config_entries(base, changes, pop_key=True)
+#     assert base == {"lst": ["only"]}

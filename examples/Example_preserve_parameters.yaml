@@ -1,0 +1,161 @@
+# Experiment Configuration File
+# This file sets up parameters for both the control and perturbation experiments.
+# Adjust the settings below as needed for your environment and model.
+
+model_type: access-om3 # Specify the model ("access-om2", "access-om3", "access-esm1.5", or "access-esm1.6")
+repository_url: git@github.com:ACCESS-NRI/access-esm1.6-configs.git
+start_point: "61b5e1c" # Control commit hash for new branches
+test_path: prototype-0.5.0-preserve-parameters # All control and perturbation experiment repositories will be created here; can be relative, absolute or ~ (user-defined)
+repository_directory: dev-preindustrial # Local directory name for the central repository (user-defined)
+
+control_branch_name: ctrl
+
+Control_Experiment:
+  # This example demonstrates how to use special markers in the control experiment.
+  # PRESERVE keeps the original value from the base config.
+  # REMOVE deletes the key entirely.
+  # null (or empty/~) sets the key to None.
+  ice/cice_in.nml:
+    domain_nml:
+      nprocs: PRESERVE
+      processor_shape: "'slenderX1'"
+      maskhalo_dyn: false
+      maskhalo_bound: REMOVE
+      maskhalo_remap: # empty/null/~ sets this to None
+
+
+Perturbation_Experiment:
+  # This section demonstrates various ways to specify parameters for perturbation experiments.
+  # You can mix and match these methods as needed.
+
+
+  # 1. Simple values
+  Parameter_block1:
+    branches:
+      - perturb_1a
+      - perturb_2a
+    ice/cice_in.nml:
+      setup_nml:
+        # both branches share the following updates
+        use_leap_years: PRESERVE # keeps the original use_leap_years = .true.
+        use_restart_time: False # use_restart_time = .false.
+        diagfreq: REMOVE # diagfreq is removed
+        runtype: # empty or null or ~ sets -> runtype = None
+
+
+  # 2. Per-branch lists
+  Parameter_block2:
+    branches:
+      - perturb_1b
+      - perturb_2b
+      - perturb_3b
+    ice/cice_in.nml:
+      setup_nml:
+        use_restart_time:
+          # 1st branch
+          - # empty or null or ~ sets -> runtype = None
+          # 2nd branch
+          - REMOVE # use_restart_time is removed
+          # 3rd branch
+          - PRESERVE # keeps the original use_restart_time = .true.
+
+
+  # 3. Lists of lists (positional indexing)
+  Parameter_block3:
+    branches:
+      - perturb_1c
+      - perturb_2c
+      - perturb_3c
+    config.yaml:
+      submodels:
+      # This is following 
+      # ─────────────────────────────────────────────────────────────────────────────
+      # Pattern 1: One inventory broadcast to all branches
+      # ─────────────────────────────────────────────────────────────────────────────
+      # in `examples/Example_esm1.6_submodules.yaml`
+      #
+      # Per-branch differences live inside individual fields using 
+      # per-branch lists
+
+        # - - everything in this is for submodel1
+          # - everything in this is for submodel2
+          # - everything in this is for submodel3
+          # - everything in this is for submodel4
+          # ...
+        # below ncpus 
+        - - ncpus: # atmosphere
+              - PRESERVE # ncpus for atmosphere in the 1st branch
+              - 10 # ncpus for atmosphere in the 2nd branch
+              - 20 # ncpus for atmosphere in the 3rd branch
+          - ncpus: # ocean
+              - 30 # ncpus for ocean in the 1st branch
+              - REMOVE # ncpus for ocean in the 2nd branch -> removes this entry
+              - PRESERVE # ncpus for ocean in the 3rd branch
+          - ncpus: # ice
+              - 40 # ncpus for ice in the 1st branch
+              - 50 # ncpus for ice in the 2nd branch
+              - null # ncpus for ice in the 3rd branch
+          - input: # coupler
+              - - PRESERVE # keeps all elements under `input` for the 1st branch
+              - - REMOVE # removes the 1st element under `input` for the 2nd branch
+              - - replace_1st_ncfile_only.nc # replaces the 1st element under `input` for the 3rd branch
+
+
+  # 4. Nested dicts with branch-indexed fields
+  Parameter_block4:
+    branches:
+      - perturb_1d
+      - perturb_2d
+      - perturb_3d
+
+    ocean/diagnostic_profiles/source_yaml_files/diag_table_standard_source.yaml:
+      # This is following 
+      # ─────────────────────────────────────────────────────────────────────────────
+      # Pattern 1: One diagnostic with branch-indexed fields
+      # ─────────────────────────────────────────────────────────────────────────────
+      # in `examples/Example_diag_table_source.yaml`
+      #
+      # Use a single diagnostic entry and supply its `fields` as a list, where each
+      # element is a mapping of variables for that branch.
+      diag_table:
+      # Each entry under `diag_table` is a nested mapping. Some inner keys
+      # (e.g. `file_name`) can themselves contain lists. This example shows
+      # how to control them with special markers:
+      #   - Use PRESERVE to keep specific elements unchanged.
+      #   - Use REMOVE to drop specific elements.
+      #
+      # For list indexing: if you only want to change, say, the 3rd or 4th
+      # elements, mark the 1st and 2nd with PRESERVE. Any elements beyond
+      # those you explicitly modify are left unchanged.
+
+        - 'monthly scalar ocean fields':
+            defaults:
+              # 1st branch
+              - output_freq: 0  # only changing this entry for the 1st branch
+                                # everything else is preserved as is now!
+              # 2nd branch
+              - file_name:
+                  - - PRESERVE  # it preserves the 1st element under `file_name`
+                    - REMOVE    # it removes the 2nd element under `file_name`
+                   # NOTE: everything else is preserved as is now! 
+              # 3rd branch
+              - file_name:
+                  - - PRESERVE  # it preserves the 1st element under `file_name`
+                    - PRESERVE  # it preserves the 2nd element under `file_name`
+                    - PRESERVE  # it preserves the 3rd element under `file_name`
+                    - REMOVE # it removes the 4th element for the 3rd branch only
+                    # NOTE: the 5th element under `file_name` - `file_name_date` is preserved as is!
+
+          'monthly 2d BGC surface fields':
+          # 1st branch
+            - REMOVE # Removes this entire entry for the 1st branch
+            - PRESERVE # Keeps this entire entry for the 2nd branch
+            - defaults:
+                file_name_prefix: oceanbgc2 # Only changes this entry for the 3rd branch
+
+          'monthly 2d BGC fields': REMOVE # removes this entire entry for all branches
+
+          'monthly 2d ocean fields':
+            - PRESERVE # Keeps this entire entry for the 1st branch
+            - REMOVE # Removes this entire entry for the 2nd branch
+            - PRESERVE # Keeps this entire entry for the 3rd branch

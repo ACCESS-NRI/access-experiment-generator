@@ -46,40 +46,6 @@ def test_update_nml_params_remove(tmp_path):
     assert "inner" not in parsed["grp"]
 
 
-@pytest.mark.parametrize("angle", [0, 30, 90])
-def test_turning_angle_writes_cosw_sinw(tmp_path, angle):
-    repo = tmp_path / "repo"
-    repo.mkdir()
-
-    nml_file = repo / "cice_in.nml"
-    nml_file.write_text("&ice_nml\n /\n")
-
-    updater = F90NamelistUpdater(repo)
-    updater.update_nml_params({"ice_nml": {"turning_angle": angle}}, nml_file.name)
-
-    parsed = f90nml.read(nml_file)
-
-    rad = math.radians(angle)
-
-    assert np.isclose(parsed["dynamics_nml"]["cosw"], math.cos(rad), atol=1e-12)
-    assert np.isclose(parsed["dynamics_nml"]["sinw"], math.sin(rad), atol=1e-12)
-
-
-def test_turning_angle_none_skips_processing(tmp_path):
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    nml_file = repo / "ice_in"
-    nml_file.write_text("&grp\n    turning_angle = 45.\n/\n")
-
-    updater = F90NamelistUpdater(repo)
-    updater.update_nml_params({"grp": {"turning_angle": None}}, nml_file.name)
-
-    parsed = f90nml.read(nml_file)
-    assert "turning_angle" in parsed["grp"]
-    assert parsed["grp"]["turning_angle"] == 45.0  # unchanged
-    assert "dynamics_nml" not in parsed
-
-
 def test_group_created_and_vars_set(tmp_path):
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -146,20 +112,79 @@ def test_format_nml_params_exact_varname_match(tmp_path):
     assert lines[3].strip() == "days_to_increment = 5"
 
 
-def test_turning_angle_remove_deletes(tmp_path):
+def test_turning_angle_compute_and_deletes_key(tmp_path):
     repo = tmp_path / "repo"
     repo.mkdir()
-
-    # put turning_angle in the file to start with
-    nml_file = repo / "ice_in"
-    nml_file.write_text("&grp\n    turning_angle = 45.\n/\n")
-
+    f = repo / "ice_in"
+    f.write_text("&dynamics_nml  \n/\n")
     updater = F90NamelistUpdater(repo)
-    # now request deletion
-    updater.update_nml_params({"grp": {"turning_angle": "REMOVE"}}, nml_file.name)
+    updater.update_nml_params({"dynamics_nml": {"turning_angle": 30}}, f.name)
+    parsed = f90nml.read(f)
 
-    parsed = f90nml.read(nml_file)
-    # turning_angle should be gone
-    assert "turning_angle" not in parsed["grp"]
-    # and because we passed "REMOVE", we don't write cos/sin anywhere
+    assert "turning_angle" not in parsed["dynamics_nml"]
+    rad = math.radians(30)
+    assert np.isclose(parsed["dynamics_nml"]["cosw"], math.cos(rad))
+    assert np.isclose(parsed["dynamics_nml"]["sinw"], math.sin(rad))
+
+
+def test_turning_angle_under_other_group_does_not_compute_cos_sin(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    f = repo / "ice_in"
+    f.write_text("&grp \n/\n")
+    updater = F90NamelistUpdater(repo)
+    updater.update_nml_params({"grp": {"turning_angle": 20}}, f.name)
+    parsed = f90nml.read(f)
+    # turning_angle remains/updates in grp
+    assert parsed["grp"]["turning_angle"] == 20.0
+    # no cos/sin created
     assert "dynamics_nml" not in parsed
+
+
+def test_turning_angle_remove_only_affects_dynamics_cos_sin(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    f = repo / "ice_in"
+    # seed cos/sin and a turning_angle under grp (not dynamics)
+    f.write_text("&grp  \n/\n&dynamics_nml\n  cosw = 0.5\n  sinw = 0.5\n/\n")
+    updater = F90NamelistUpdater(repo)
+    # REMOVE under grp should not touch cos/sin; turning_angle in grp handled by normal loop
+    updater.update_nml_params({"grp": {"turning_angle": "REMOVE"}}, f.name)
+    parsed = f90nml.read(f)
+    assert parsed["dynamics_nml"]["cosw"] == 0.5
+    assert parsed["dynamics_nml"]["sinw"] == 0.5
+
+    # REMOVE under dynamics_nml drops cos/sin and deletes the key
+    updater.update_nml_params({"dynamics_nml": {"turning_angle": "REMOVE"}}, f.name)
+    parsed = f90nml.read(f)
+    assert "dynamics_nml" in parsed
+    assert "cosw" not in parsed["dynamics_nml"]
+    assert "sinw" not in parsed["dynamics_nml"]
+    assert parsed["dynamics_nml"] == {}
+
+
+def test_turning_angle_preserve_requires_existing_cos_sin(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    f = repo / "ice_in"
+    # dynamics_nml with NO cos and sin
+    f.write_text("&dynamics_nml  \n/\n")
+    updater = F90NamelistUpdater(repo)
+
+    # PRESERVE but no cos and sin -> should raise
+    with pytest.raises(ValueError):
+        updater.update_nml_params({"dynamics_nml": {"turning_angle": "PRESERVE"}}, f.name)
+
+
+def test_turning_angle_preserve_keeps_existing_cos_sin(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    f = repo / "ice_in"
+    f.write_text("&dynamics_nml\n cosw = 0.1\n  sinw = 0.2\n/\n")
+    updater = F90NamelistUpdater(repo)
+    updater.update_nml_params({"dynamics_nml": {"turning_angle": "PRESERVE"}}, f.name)
+    parsed = f90nml.read(f)
+
+    assert "turning_angle" not in parsed["dynamics_nml"]
+    assert parsed["dynamics_nml"]["cosw"] == 0.1
+    assert parsed["dynamics_nml"]["sinw"] == 0.2
