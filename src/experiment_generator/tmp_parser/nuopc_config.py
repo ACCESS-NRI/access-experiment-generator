@@ -141,4 +141,4 @@ def write_nuopc_config(config: dict, file: Path):
                     stream.write("  " + label + " = " + convert_to_string(value) + "\n")
                 stream.write("::\n\n")
             else:
-                stream.write(key + ": " + " ".join(map(convert_to_string, item)) + "\n")
+                stream.write(key + ": " + convert_to_string(item) + "\n")
