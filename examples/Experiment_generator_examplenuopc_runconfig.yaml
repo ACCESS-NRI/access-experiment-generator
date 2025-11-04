@@ -1,0 +1,58 @@
+# Experiment Configuration File
+# This file sets up parameters for both the control and perturbation experiments.
+# Adjust the settings below as needed for your environment and model.
+
+model_type: access-om3 # available models can be checked via `payu list`
+repository_url: git@github.com:ACCESS-NRI/access-om3-configs.git
+start_point: "5f5e957" # Control commit hash for new branches
+test_path: prototype-0.1.0 # All control and perturbation experiment repositories will be created here; can be relative, absolute or ~ (user-defined)
+repository_directory: update_nuopc_runseq # Local directory name for the central repository (user-defined)
+
+control_branch_name: ctrl
+
+Control_Experiment:
+
+Perturbation_Experiment:
+  Parameter_block1:
+    branches:
+      - perturb_1
+      - perturb_2
+    nuopc.runseq:
+      runseq_block: 
+        - |
+          @2.0
+            MED med_phases_aofluxes_run
+            MED med_phases_prep_ocn_accum
+            MED med_phases_ocnalb_run
+            MED med_phases_diag_ocn
+            MED med_phases_prep_ice
+            MED -> ICE :remapMethod=redist
+            MED med_phases_prep_ocn_avg
+            MED -> OCN :remapMethod=redist
+            ICE
+            ROF
+            OCN
+            OCN -> MED :remapMethod=redist
+            MED med_phases_post_ocn
+            MED med_phases_diag_rof
+            MED med_phases_diag_ice_ice2med
+            ICE -> MED :remapMethod=redist
+            MED med_phases_post_ice
+            ATM
+            ATM -> MED :remapMethod=redist
+            MED med_phases_post_atm
+            MED med_phases_diag_atm
+            MED med_phases_diag_ice_med2ice
+            ROF -> MED :remapMethod=redist
+            MED med_phases_post_rof
+            MED med_phases_diag_accum
+            MED med_phases_diag_print
+            MED med_phases_history_write
+            MED med_phases_restart_write
+            MED med_phases_profile
+          @
+        - ~
+
+      cpl_dt:
+        - ~
+        - 10.0
