@@ -30,7 +30,7 @@ class NuopcRunseqUpdater:
         # Update runseq block if provided
         if "runseq_block" in param_dict and param_dict["runseq_block"]:
             new_commands = modify_runseq(
-                commands=[], # ignore when new_block is provided
+                commands=[],  # ignore when new_block is provided
                 new_block=param_dict["runseq_block"],
             )
             write_runseq(new_commands, nml_path)

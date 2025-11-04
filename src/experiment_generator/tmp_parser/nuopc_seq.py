@@ -19,12 +19,13 @@ def read_runseq(filepath: Path) -> list[str]:
             commands.append(stripped)
     return commands
 
+
 def modify_runseq(
-        commands: list[str],
-        old_val: str | None = None,
-        new_val: str | None = None,
-        new_block: str | None = None,
-        ) -> list[str]:
+    commands: list[str],
+    old_val: str | None = None,
+    new_val: str | None = None,
+    new_block: str | None = None,
+) -> list[str]:
     """
     if new_block is provided, replace entire runSeq block with new_block. Otherwise,
     replace line starting with @old_val with @new_val.
@@ -39,6 +40,7 @@ def modify_runseq(
         else:
             new_commands.append(cmd)
     return new_commands
+
 
 def write_runseq(commands: list[str], output_path: Path, indent: int = 2):
     with open(output_path, "w") as f:
