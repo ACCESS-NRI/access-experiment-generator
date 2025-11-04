@@ -1,40 +1,56 @@
-import re
+from pathlib import Path
 
 
-def read_runseq(filepath):
+def read_runseq(filepath: Path) -> list[str]:
     with open(filepath, "r") as f:
         lines = f.readlines()
 
     inside_block = False
-    commands = []
+    commands: list[str] = []
 
     for line in lines:
         stripped = line.strip()
         if stripped.startswith("runSeq::"):
             inside_block = True
             continue
-        if stripped.startswith("::") and inside_block:
+        if inside_block and stripped == "::":
             break
         if inside_block and stripped:
             commands.append(stripped)
     return commands
 
 
-def modify_runseq(commands, old_val="900", new_val="1080"):
-    modified = []
+def modify_runseq(
+    commands: list[str],
+    old_val: str | None = None,
+    new_val: str | None = None,
+    new_block: str | None = None,
+) -> list[str]:
+    """
+    if new_block is provided, replace entire runSeq block with new_block. Otherwise,
+    replace line starting with @old_val with @new_val.
+    """
+    if new_block is not None:
+        return [line.strip() for line in new_block.splitlines() if line.strip()]
+
+    new_commands = []
     for cmd in commands:
         if cmd.strip().startswith(f"@{old_val}"):
-            match = re.match(rf"@{old_val}\b", cmd.strip())
-            if match:
-                modified.append(cmd.replace(f"@{old_val}", f"@{new_val}", 1))
-                continue
-        modified.append(cmd)
-    return modified
+            new_commands.append(f"@{new_val}")
+        else:
+            new_commands.append(cmd)
+    return new_commands
 
 
-def write_runseq(commands, output_path):
+def write_runseq(commands: list[str], output_path: Path, indent: int = 2):
     with open(output_path, "w") as f:
         f.write("runSeq::\n")
         for cmd in commands:
-            f.write(f"  {cmd}\n")
+            tmp = cmd.strip()
+            if not tmp:
+                continue
+            if tmp.startswith("@"):
+                f.write(f"{tmp}\n")
+            else:
+                f.write(f"{' ' * indent}{tmp}\n")
         f.write("::\n")

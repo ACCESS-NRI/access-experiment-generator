@@ -27,6 +27,16 @@ class NuopcRunseqUpdater:
         """
         nml_path = self.directory / target_file
 
+        # Update runseq block if provided
+        if "runseq_block" in param_dict and param_dict["runseq_block"]:
+            new_commands = modify_runseq(
+                commands=[],  # ignore when new_block is provided
+                new_block=param_dict["runseq_block"],
+            )
+            write_runseq(new_commands, nml_path)
+            return
+
+        # Otherwise, just update cpl_dt line
         raw_lines = read_runseq(nml_path)
 
         old_val = None
@@ -39,5 +49,5 @@ class NuopcRunseqUpdater:
         if old_val is None:
             raise ValueError("Could not find a line beginning with '@<number>'in nuopc.runseq file")
 
-        modifies_lines = modify_runseq(raw_lines, old_val=old_val, new_val=param_dict["cpl_dt"])
-        write_runseq(modifies_lines, nml_path)
+        new_commands = modify_runseq(raw_lines, old_val=old_val, new_val=param_dict["cpl_dt"])
+        write_runseq(new_commands, nml_path)
