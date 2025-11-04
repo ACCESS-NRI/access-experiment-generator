@@ -211,3 +211,21 @@ Perturbation_Experiment:
                 # Biogeochemistry
               - /g/data/vk83/configurations/inputs/access-esm1p5/modern/share/ocean/biogeochemistry/global.1deg/2020.05.19/dust.nc
               - /g/data/vk83/configurations/inputs/access-esm1p5/modern/share/ocean/biogeochemistry/global.1deg/2020.05.19/ocmip2_press_monthly_om1p5_bc.nc
+
+  Parameter_block3:
+  # Follows pattern 1 single inventory broadcast to all branches, with per-branch differences
+  # Pattern 3: but there is no need to write the full inventory because of the positional indexing is enabled in 
+  # https://github.com/ACCESS-NRI/access-experiment-generator/commit/ad775f75564ca1267a7339e81bcdf5d6ffbba1e8
+  # ‼️ Note: in the list of lists format, make sure each inner list has the same order of the original files.
+    branches: 
+      - perturb_1c
+      - perturb_2c
+      - perturb_3c
+
+    config.yaml:
+      submodels:
+        - - ncpus: [104, 208, 416] # atmosphere core counts for three branches
+          - ncpus: [196, 392, 784] # ocean core counts for three branches
+          - ncpus: [32, 64, 128] # ice core counts for three branches
+      # Then the rest of the inventory remains the same as the control branch, this is useful specific for scaling studies,
+      # e.g. in https://github.com/ACCESS-NRI/access-models-scaling

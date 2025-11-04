@@ -126,14 +126,14 @@ Perturbation_Experiment:
               dimension:
                 - - "temporal"
                   - "spatial"
-                - REMOVE
+                - ~
               value:
                 - - "test_data/temporal.RYF.rsds.1990_1991.nc"
                   - "test_data/spatial.RYF.rsds.1990_1991.nc"
-                - REMOVE
+                - ~
               calendar:
                 - forcing
-                - REMOVE
+                - ~
               comment:
                 - ""
-                - REMOVE
+                - ~
