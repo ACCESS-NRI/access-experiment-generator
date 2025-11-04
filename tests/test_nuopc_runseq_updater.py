@@ -1,5 +1,6 @@
 import pytest
 from pathlib import Path
+from textwrap import dedent
 from experiment_generator.nuopc_runseq_updater import NuopcRunseqUpdater
 
 
@@ -37,3 +38,40 @@ def test_update_nuopc_runseq_raises_if_no_at_line(tmp_path):
 
     with pytest.raises(ValueError, match="Could not find a line beginning"):
         updater.update_nuopc_runseq({"cpl_dt": 10}, bad_runseq.name)
+
+
+def test_update_nuopc_runseq_replace_block_only(tmp_path):
+    """
+    When runseq_block is provided, we replace the whole block
+    """
+    repo_dir = tmp_path / "repo_block"
+    repo_dir.mkdir()
+
+    runseq_path = repo_dir / "nuopc.runseq"
+
+    runseq_path.write_text(
+        "runSeq::\n" "@1100\n" "  MED do_something\n" "  OCN do_something\n" "@\n" "::\n",
+    )
+
+    new_block = dedent(
+        """
+        @1.0
+          MED do_something2
+          OCN
+        @
+        """
+    )
+
+    updater = NuopcRunseqUpdater(repo_dir)
+    params = {"runseq_block": new_block}
+    updater.update_nuopc_runseq(params, runseq_path.name)
+
+    updated = runseq_path.read_text().splitlines()
+
+    assert updated[0].startswith("runSeq::")
+
+    assert updated[2].startswith("  ")
+    assert updated[2].strip().startswith("MED do_something2")
+
+    assert updated[-2].strip() == "@"
+    assert updated[-1].strip() == "::"
