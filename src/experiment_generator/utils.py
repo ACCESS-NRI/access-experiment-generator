@@ -13,6 +13,17 @@ from collections.abc import Mapping, Sequence
 from .common_var import _is_removed_str, _is_preserved_str, _is_seq
 
 
+def _path_join(path: str, key: str) -> str:
+    return f"{path}.{key}" if path else key
+
+
+def _remove_state_key(path: str, index: int) -> str:
+    """
+    uniquely identify a positional REMOVE marker at this location
+    """
+    return f"{path}::REMOVE[{index}]"
+
+
 def _strip_preserved(x):
     """
     Remove any value marked as `PRESERVE` from an update tree.
@@ -95,7 +106,9 @@ def _clean_removes(x, *, pop_key: bool) -> object:
     return x
 
 
-def _merge_lists_positional(base_list: list, change_list: list, *, pop_key: bool) -> list:
+def _merge_lists_positional(
+    base_list: list, change_list: list, *, path: str, state: dict | None, pop_key: bool
+) -> list | None:
     """
     Merge two lists by index:
 
@@ -109,13 +122,30 @@ def _merge_lists_positional(base_list: list, change_list: list, *, pop_key: bool
     - For indices beyond len(base_list): append cleaned change items.
 
     "REMOVE" / "PRESERVE" for scalars and nested structures are respected.
+
+    Updates:
+        merge two lists by index, but make REMOVE unaccidental deletions explicit across runs
+            1. First run, for each positional REMOVE, record a unique key in state store
+            2. On later runs, REMOVE[i] removes that recorded value wherever it appears, even if indices shifted.
+        can return None if the entire list is removed
     """
-    # If every element in change_list is "REMOVE", remove the whole thing
-    if change_list and all(_is_removed_str(c) for c in change_list):
-        return None
+    if state is None:
+        state = {}
+
+    # comment out this for remove state store support
+    # # If every element in change_list is "REMOVE", remove the whole thing
+    # if change_list and all(_is_removed_str(c) for c in change_list):
+    #     return None
 
     out = []
     max_len = max(len(base_list), len(change_list))
+
+    # pre-compute "remembered removals" for this list path
+    remembered_removals = []
+    prefix = f"{path}::REMOVE["
+    for key, value in state.items():
+        if isinstance(key, str) and key.startswith(prefix):
+            remembered_removals.append(value)
 
     # walk both lists by index, building a new list.
     for i in range(max_len):
@@ -145,13 +175,21 @@ def _merge_lists_positional(base_list: list, change_list: list, *, pop_key: bool
 
         # Drop this slot if "REMOVE"
         if _is_removed_str(c):
+            state_key = _remove_state_key(path, i)
+            if state_key not in state and have_base:
+                # first time record what is being removed at this position
+                state[state_key] = base_list[i]
+                remembered_removals.append(base_list[i])
+
+            if have_base:
+                out.append(base_list[i])
             # omit base[i] (i.e. don't append anything)
             continue
 
         # If both sides exist and are mappings, recursively merge
         if have_base and isinstance(base_list[i], Mapping) and isinstance(c, Mapping):
             merged = dict(base_list[i])  # shallow copy
-            update_config_entries(merged, c, pop_key=pop_key)
+            update_config_entries(merged, c, pop_key=pop_key, path=_path_join(path, f"[{i}]"), state=state)
             # If merging produced an empty mapping and pop_key=True, drop the slot
             if not merged and pop_key:
                 continue
@@ -160,7 +198,9 @@ def _merge_lists_positional(base_list: list, change_list: list, *, pop_key: bool
 
         # If both sides exist and are lists, recursively merge lists
         if have_base and isinstance(base_list[i], list) and isinstance(c, list):
-            out.append(_merge_lists_positional(base_list[i], c, pop_key=pop_key))
+            out.append(
+                _merge_lists_positional(base_list[i], c, path=_path_join(path, f"[{i}]"), state=state, pop_key=pop_key)
+            )
             continue
 
         # Otherwise: replace with cleaned change element
@@ -170,10 +210,16 @@ def _merge_lists_positional(base_list: list, change_list: list, *, pop_key: bool
             continue
         out.append(cleaned)
 
+    if remembered_removals:
+        # second pass: remove any remembered removals that may have shifted position
+        out = [x for x in out if x not in remembered_removals]
+
     return out
 
 
-def update_config_entries(base: dict, change: dict, pop_key: bool = True) -> None:
+def update_config_entries(
+    base: dict, change: dict, path: str = "", state: dict | None = None, pop_key: bool = True
+) -> None:
     """
     Recursively update or remove entries in a nested dictionary in place.
 
@@ -192,21 +238,29 @@ def update_config_entries(base: dict, change: dict, pop_key: bool = True) -> Non
       and passing it to the cleaning routine. After cleaning:
        - If k remains, use its cleaned value.
        - If k is absent, it was removed during cleaning, so remove it from base.
+
+    Update:
+        support state store for remembering positional REMOVE markers across runs
     """
+    if state is None:
+        state = {}
+
     for k, v in change.items():
         # strip "PRESERVE" first
         should_apply, v = _strip_preserved(v)
         if not should_apply:
             continue  # no change for this key; keep existing value
 
+        key_path = _path_join(path, str(k))
+
         if isinstance(v, Mapping) and isinstance(base.get(k), Mapping):
-            update_config_entries(base[k], v, pop_key=pop_key)
+            update_config_entries(base[k], v, path=key_path, state=state, pop_key=pop_key)
             if pop_key and isinstance(base[k], Mapping) and not base[k]:
                 base.pop(k, None)
             continue
 
         if isinstance(base.get(k), list) and isinstance(v, list):
-            merged = _merge_lists_positional(base[k], v, pop_key=pop_key)
+            merged = _merge_lists_positional(base[k], v, path=key_path, state=state, pop_key=pop_key)
             # if merge returned None -> delete key
             if merged is None:
                 base.pop(k, None)
