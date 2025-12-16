@@ -5,7 +5,6 @@ BRANCH_KEY = "branches"
 REMOVED = "REMOVE"
 PRESERVED = "PRESERVE"
 # Directory name to store REMOVE state files
-# Dont change this variable name as it is hard-coded to .gitignore
 REMOVE_STATE_DIR = ".expt_remove_states"
 
 
