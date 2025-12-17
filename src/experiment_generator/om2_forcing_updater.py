@@ -20,6 +20,7 @@ class Om2ForcingUpdater:
         self,
         param_dict: dict,
         target_file: Path,
+        state: dict,
     ) -> None:
         forcing_path = self.directory / target_file
         file_read = read_json(forcing_path)
@@ -46,7 +47,7 @@ class Om2ForcingUpdater:
             for k in keys_to_drop:
                 updates.pop(k, None)
 
-            update_config_entries(base, updates)
+            update_config_entries(base, updates, path=str(target_file), state=state)
 
         write_json(file_read, forcing_path)
 

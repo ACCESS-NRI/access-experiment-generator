@@ -19,6 +19,9 @@ PELAYOUT_attributes::
     )
 
     updater = NuopcRunConfigUpdater(repo_dir)
+
+    state = {}
+
     updater.update_runconfig_params(
         {
             "PELAYOUT_attributes": {
@@ -29,6 +32,7 @@ PELAYOUT_attributes::
             }
         },
         runconfig_path.name,
+        state,
     )
 
     new_nuopc_config = read_nuopc_config(runconfig_path)

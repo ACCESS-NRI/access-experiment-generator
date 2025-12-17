@@ -22,7 +22,7 @@ class ConfigUpdater:
         """
         self.directory = directory
 
-    def update_config_params(self, param_dict: dict, target_file: Path) -> None:
+    def update_config_params(self, param_dict: dict, target_file: Path, state: dict) -> None:
         """
         Update `config.yaml` parameters using values from the input dictionary.
 
@@ -48,7 +48,7 @@ class ConfigUpdater:
         param_dict["jobname"] = self.directory.name
 
         # Apply updates to the config.yaml file
-        update_config_entries(file_read, param_dict)
+        update_config_entries(file_read, param_dict, pop_key=True, path=str(target_file), state=state)
 
         # write to the config.yaml file
         write_yaml(file_read, nml_path.as_posix())

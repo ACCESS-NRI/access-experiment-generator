@@ -79,32 +79,32 @@ class _RecorderBase:
 
 
 class F90Recorder(_RecorderBase):
-    def update_nml_params(self, params, filename):
+    def update_nml_params(self, params, filename, state=None, **kwargs):
         self._record("update_nml_params", params, filename)
 
 
 class PayuconfigRecorder(_RecorderBase):
-    def update_config_params(self, params, filename):
+    def update_config_params(self, params, filename, state=None, **kwargs):
         self._record("update_config_params", params, filename)
 
 
 class RunconfigRecorder(_RecorderBase):
-    def update_runconfig_params(self, params, filename):
+    def update_runconfig_params(self, params, filename, state=None, **kwargs):
         self._record("update_runconfig_params", params, filename)
 
 
 class Mom6Recorder(_RecorderBase):
-    def update_mom6_params(self, params, filename):
+    def update_mom6_params(self, params, filename, state=None, **kwargs):
         self._record("update_mom6_params", params, filename)
 
 
 class RunseqRecorder(_RecorderBase):
-    def update_nuopc_runseq(self, params, filename):
+    def update_nuopc_runseq(self, params, filename, state=None, **kwargs):
         self._record("update_nuopc_runseq", params, filename)
 
 
 class Om2forcingRecorder(_RecorderBase):
-    def update_forcing_params(self, params, filename):
+    def update_forcing_params(self, params, filename, state=None, **kwargs):
         self._record("update_forcing_params", params, filename)
 
 

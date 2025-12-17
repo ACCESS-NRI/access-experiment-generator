@@ -4,6 +4,8 @@ from collections.abc import Sequence
 BRANCH_KEY = "branches"
 REMOVED = "REMOVE"
 PRESERVED = "PRESERVE"
+# Directory name to store REMOVE state files
+REMOVE_STATE_DIR = ".expt_remove_states"
 
 
 def _is_removed_str(x) -> bool:

@@ -43,8 +43,8 @@ def patch_json_and_utils(monkeypatch, sample_input):
         tmp_data = json.dumps(data)
         calls["write_json"].append((tmp_data, path))
 
-    def dummy_update_config_entries(base: dict, updates: dict):
-        calls["update_config_entries"].append((base, updates))
+    def dummy_update_config_entries(base: dict, updates: dict, **kwargs):
+        calls["update_config_entries"].append((base, updates, kwargs))
         for k, v in updates.items():
             base[k] = v
 
@@ -89,7 +89,9 @@ def test_update_forcing_params_correct_path(tmp_repo_dir, patch_json_and_utils):
             ],
         },
     }
-    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"))
+
+    state = {}
+    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"), state=state)
 
     # read and write
     assert patch_json_and_utils["read_json"] == [tmp_repo_dir / "atmosphere" / "forcing.json"]
@@ -122,19 +124,22 @@ def test_all_removed_perturbations_warn_and_skip(tmp_repo_dir, patch_json_and_ut
         }
     }
 
+    state = {}
+
     with pytest.warns(UserWarning):
-        updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"))
+        updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"), state=state)
 
     assert len(patch_json_and_utils["update_config_entries"]) == 1
-    _, updates = patch_json_and_utils["update_config_entries"][0]
+    _, updates, _ = patch_json_and_utils["update_config_entries"][0]
     assert "perturbations" not in updates
 
 
 def test_fieldname_not_found_raises(tmp_repo_dir, patch_json_and_utils):
     updater = Om2ForcingUpdater(tmp_repo_dir)
     tmp = {"not_in_file": {"filename": "x.nc", "cname": "X"}}
+    state = {}
     with pytest.raises(ValueError):
-        updater.update_forcing_params(tmp, target_file=Path("atmosphere/forcing.json"))
+        updater.update_forcing_params(tmp, target_file=Path("atmosphere/forcing.json"), state=state)
     assert patch_json_and_utils["write_json"] == []
 
 
@@ -142,20 +147,22 @@ def test_fieldname_not_found_raises(tmp_repo_dir, patch_json_and_utils):
 def test_empty_or_none_perturbations_warn_and_removed(tmp_repo_dir, patch_json_and_utils, empty):
     updater = Om2ForcingUpdater(tmp_repo_dir)
     tmp = {"tas": {"filename": "x.nc", "cname": "X", "perturbations": empty}}
+    state = {}
     with pytest.warns(UserWarning):
-        updater.update_forcing_params(tmp, target_file=Path("atmosphere/forcing.json"))
+        updater.update_forcing_params(tmp, target_file=Path("atmosphere/forcing.json"), state=state)
     # ensure preprocess removed the key before merging
     assert len(patch_json_and_utils["update_config_entries"]) == 1
-    _, updates = patch_json_and_utils["update_config_entries"][0]
+    _, updates, _ = patch_json_and_utils["update_config_entries"][0]
     assert "perturbations" not in updates
 
 
 @pytest.mark.parametrize("invalid", [42, "oops", [1, 2], [{"type": "scaling"}, "invalid"]])
 def test_invalid_perturbations_type_raises(tmp_repo_dir, patch_json_and_utils, invalid):
     updater = Om2ForcingUpdater(tmp_repo_dir)
+    state = {}
     tmp = {"tas": {"filename": "x.nc", "cname": "X", "perturbations": invalid}}
     with pytest.raises(TypeError):
-        updater.update_forcing_params(tmp, target_file=Path("atmosphere/forcing.json"))
+        updater.update_forcing_params(tmp, target_file=Path("atmosphere/forcing.json"), state=state)
     assert patch_json_and_utils["write_json"] == []
 
 
@@ -234,9 +241,9 @@ def test_invalid_type_branch_removes_perturbations(tmp_repo_dir, patch_json_and_
             ],
         }
     }
-
+    state = {}
     with pytest.raises(ValueError):
-        updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"))
+        updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"), state=state)
 
     assert patch_json_and_utils["update_config_entries"] == []
     assert patch_json_and_utils["write_json"] == []
@@ -253,11 +260,12 @@ def test_top_level_perturbations_preserved_scalar_is_dropped(tmp_repo_dir, patch
             "perturbations": "PRESERVE",
         }
     }
-    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"))
+    state = {}
+    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"), state=state)
 
     # ensure we merged without 'perturbations'
     assert len(patch_json_and_utils["update_config_entries"]) == 1
-    _, updates = patch_json_and_utils["update_config_entries"][0]
+    _, updates, _ = patch_json_and_utils["update_config_entries"][0]
     assert "perturbations" not in updates
     assert updates["filename"] == "tas.nc"
 
@@ -273,9 +281,10 @@ def test_top_level_perturbations_preserved_singleton_list_is_dropped(tmp_repo_di
             "perturbations": ["PRESERVE"],
         }
     }
-    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"))
+    state = {}
+    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"), state=state)
     assert len(patch_json_and_utils["update_config_entries"]) == 1
-    _, updates = patch_json_and_utils["update_config_entries"][0]
+    _, updates, _ = patch_json_and_utils["update_config_entries"][0]
     assert "perturbations" not in updates
     assert updates["filename"] == "tas.nc"
 
@@ -298,9 +307,10 @@ def test_top_level_keys_marked_preserved_are_dropped_before_merge(tmp_repo_dir, 
             },
         }
     }
-    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"))
+    state = {}
+    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"), state=state)
     # ensure 'filename' key didn't get passed to the merger
-    _, updates = patch_json_and_utils["update_config_entries"][0]
+    _, updates, _ = patch_json_and_utils["update_config_entries"][0]
     assert "filename" not in updates
     assert "perturbations" in updates
 
@@ -331,9 +341,10 @@ def test_preprocess_perturbations_type_preserved_skips_that_entry(tmp_repo_dir, 
             ]
         }
     }
-    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"))
+    state = {}
+    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"), state=state)
     # exactly one perturbation survives and is passed to merger
-    _, updates = patch_json_and_utils["update_config_entries"][0]
+    _, updates, _ = patch_json_and_utils["update_config_entries"][0]
     perts = updates["perturbations"]
     assert isinstance(perts, list) and len(perts) == 1
     assert perts[0]["type"] == "offset"
@@ -359,11 +370,35 @@ def test_preprocess_perturbations_inner_fields_preserved_are_dropped(tmp_repo_di
             ]
         }
     }
-    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"))
-    _, updates = patch_json_and_utils["update_config_entries"][0]
+    state = {}
+    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"), state=state)
+    _, updates, _ = patch_json_and_utils["update_config_entries"][0]
     (pert,) = updates["perturbations"]
     assert "comment" not in pert  # dropped
     # sanity: others remain
     assert pert["type"] == "scaling"
     assert pert["dimension"] == "temporal"
     assert pert["calendar"] == "forcing"
+
+
+def test_update_forcing_params_no_perturbations_key_skips_branch(tmp_repo_dir, patch_json_and_utils, monkeypatch):
+    updater = Om2ForcingUpdater(tmp_repo_dir)
+    params = {
+        "tas": {
+            "filename": "NEW/tas.nc",
+            "cname": "tair_ai",
+            # NOTE: no "perturbations" key at all
+        }
+    }
+    state = {}
+
+    updater.update_forcing_params(params, target_file=Path("atmosphere/forcing.json"), state=state)
+
+    # update_config_entries should be called once (for tas)
+    assert len(patch_json_and_utils["update_config_entries"]) == 1
+    _, updates, _ = patch_json_and_utils["update_config_entries"][0]
+    assert "perturbations" not in updates
+    assert updates["filename"] == "NEW/tas.nc"
+
+    # write_json called once
+    assert len(patch_json_and_utils["write_json"]) == 1

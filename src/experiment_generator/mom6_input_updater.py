@@ -18,6 +18,7 @@ class Mom6InputUpdater:
         self,
         param_dict: dict,
         target_file: str,
+        state: dict,
     ) -> None:
         """
         Updates parameters and overwrites the MOM6 input file.
@@ -33,7 +34,8 @@ class Mom6InputUpdater:
 
         # Update the parameters
         # Note: This will remove keys with value "REMOVE" only
-        update_config_entries(base_params, param_dict, pop_key=True)
+        # stored state is dummy in this updater since there is no list handling here
+        update_config_entries(base_params, param_dict, pop_key=True, path=str(target_file), state=state)
 
         # Write the updated parameters back to the MOM6 input file
         write_mom_input(raw_lines, base_params, nml_path)

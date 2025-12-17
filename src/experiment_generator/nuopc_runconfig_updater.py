@@ -24,6 +24,7 @@ class NuopcRunConfigUpdater:
         self,
         param_dict: dict,
         target_file: str,
+        state: dict,
     ) -> None:
         """
         Updates parameters and overwrites the `nuopc.runconfig` file.
@@ -34,5 +35,6 @@ class NuopcRunConfigUpdater:
         nml_path = self.directory / target_file
 
         file_read = read_nuopc_config(nml_path)
-        update_config_entries(file_read, param_dict)
+        # stored state is dummy in this updater since there is no list handling here
+        update_config_entries(file_read, param_dict, pop_key=True, path=str(target_file), state=state)
         write_nuopc_config(file_read, nml_path)

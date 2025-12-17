@@ -14,6 +14,7 @@ from .nuopc_runseq_updater import NuopcRunseqUpdater
 from .om2_forcing_updater import Om2ForcingUpdater
 from .common_var import BRANCH_KEY, _is_removed_str, _is_preserved_str, _is_seq
 from .utils import _strip_preserved
+from .state_store import RemoveStateStore
 
 
 @dataclass
@@ -46,6 +47,9 @@ class PerturbationExperiment(BaseExperiment):
         self.directory = Path(directory)
         self.gitrepository = GitRepository(self.directory)
 
+        # state store for managing parameter removals
+        self.state_store = RemoveStateStore(self.directory)
+
         # updater for each configuration file
         self.f90namelistupdater = F90NamelistUpdater(directory)
         self.configupdater = ConfigUpdater(directory)
@@ -54,7 +58,7 @@ class PerturbationExperiment(BaseExperiment):
         self.nuopcrunsequpdater = NuopcRunseqUpdater(directory)
         self.om2forcingupdater = Om2ForcingUpdater(directory)
 
-    def _apply_updates(self, file_params: dict[str, dict]) -> None:
+    def _apply_updates(self, file_params: dict[str, dict], state: dict | None = None) -> None:
         """
         Apply a dict of `{filename: parameters}` to different config files.
         """
@@ -66,17 +70,17 @@ class PerturbationExperiment(BaseExperiment):
                 params = {}
 
             if filename.endswith("_in") or filename.endswith(".nml") or os.path.basename(filename) == "namelists":
-                self.f90namelistupdater.update_nml_params(params, filename)
+                self.f90namelistupdater.update_nml_params(params, filename, state=state)
             elif filename.endswith(".yaml"):
-                self.configupdater.update_config_params(params, filename)
+                self.configupdater.update_config_params(params, filename, state=state)
             elif filename == "nuopc.runconfig":
-                self.nuopcrunconfigupdater.update_runconfig_params(params, filename)
+                self.nuopcrunconfigupdater.update_runconfig_params(params, filename, state=state)
             elif filename == "MOM_input":
-                self.mom6inputupdater.update_mom6_params(params, filename)
+                self.mom6inputupdater.update_mom6_params(params, filename, state=state)
             elif filename == "nuopc.runseq":
-                self.nuopcrunsequpdater.update_nuopc_runseq(params, filename)
+                self.nuopcrunsequpdater.update_nuopc_runseq(params, filename, state=state)
             elif filename == "atmosphere/forcing.json":
-                self.om2forcingupdater.update_forcing_params(params, filename)
+                self.om2forcingupdater.update_forcing_params(params, filename, state=state)
 
     def manage_control_expt(self) -> None:
         """
@@ -145,7 +149,15 @@ class PerturbationExperiment(BaseExperiment):
         # setup each experiment (create branch names and print actions)
         for expt_def in experiment_definitions:
             self._setup_branch(expt_def, local_branches)
-            self._apply_updates(expt_def.file_params)
+            branch = expt_def.branch_name
+
+            state = self.state_store.load_state(branch)
+
+            # then pass state into updates
+            self._apply_updates(expt_def.file_params, state=state)
+
+            # save state after updates
+            self.state_store.save_state(branch, state)
 
             modified_files = [item.a_path for item in self.gitrepository.repo.index.diff(None)]
             commit_message = f"Updated perturbation files: {modified_files}"
