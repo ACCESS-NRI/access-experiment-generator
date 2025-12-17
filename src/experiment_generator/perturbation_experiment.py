@@ -12,6 +12,7 @@ from .nuopc_runconfig_updater import NuopcRunConfigUpdater
 from .mom6_input_updater import Mom6InputUpdater
 from .nuopc_runseq_updater import NuopcRunseqUpdater
 from .om2_forcing_updater import Om2ForcingUpdater
+from .field_table_updater import FieldTableUpdater
 from .common_var import BRANCH_KEY, _is_removed_str, _is_preserved_str, _is_seq
 from .utils import _strip_preserved
 from .state_store import RemoveStateStore
@@ -57,6 +58,7 @@ class PerturbationExperiment(BaseExperiment):
         self.mom6inputupdater = Mom6InputUpdater(directory)
         self.nuopcrunsequpdater = NuopcRunseqUpdater(directory)
         self.om2forcingupdater = Om2ForcingUpdater(directory)
+        self.fieldtableupdater = FieldTableUpdater(directory)
 
     def _apply_updates(self, file_params: dict[str, dict], state: dict | None = None) -> None:
         """
@@ -81,6 +83,8 @@ class PerturbationExperiment(BaseExperiment):
                 self.nuopcrunsequpdater.update_nuopc_runseq(params, filename, state=state)
             elif filename == "atmosphere/forcing.json":
                 self.om2forcingupdater.update_forcing_params(params, filename, state=state)
+            elif filename.endswith("field_table"):
+                self.fieldtableupdater.update_field_table_params(params, filename, state=state)
 
     def manage_control_expt(self) -> None:
         """
