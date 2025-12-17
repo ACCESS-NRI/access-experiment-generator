@@ -22,6 +22,9 @@ DT_THERM = 7200.0               !   [s] default = 900.0
     )
 
     updater = Mom6InputUpdater(repo_dir)
+
+    state = {}
+
     updater.update_mom6_params(
         {
             "DT": 10,
@@ -29,6 +32,7 @@ DT_THERM = 7200.0               !   [s] default = 900.0
             "DT_THERM": "REMOVE",
         },
         mom_file.name,
+        state,
     )
 
     raw_lines, params = read_mom_input(mom_file)

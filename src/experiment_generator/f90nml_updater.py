@@ -65,8 +65,9 @@ class F90NamelistUpdater:
                             if "dynamics_nml" in nml_all:
                                 nml_all["dynamics_nml"].pop("cosw", None)
                                 nml_all["dynamics_nml"].pop("sinw", None)
-                                if not nml_all["dynamics_nml"]:
-                                    nml_all.pop("dynamics_nml", None)
+                                # TODO: consider removing empty dynamics_nml group?
+                                # if not nml_all["dynamics_nml"]:
+                                #     nml_all.pop("dynamics_nml", None)
 
                         elif _is_preserved_str(turning_angle) or turning_angle is None:
                             dyn = nml_all.get("dynamics_nml", {})

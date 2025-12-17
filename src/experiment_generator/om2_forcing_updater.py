@@ -47,7 +47,7 @@ class Om2ForcingUpdater:
             for k in keys_to_drop:
                 updates.pop(k, None)
 
-            update_config_entries(base, updates, pop_key=True, path=str(target_file), state=state)
+            update_config_entries(base, updates, path=str(target_file), state=state)
 
         write_json(file_read, forcing_path)
 

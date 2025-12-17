@@ -82,7 +82,7 @@ def test_apply_updates_with_correct_updaters(tmp_repo_dir, patch_updaters, indat
     ) = patch_updaters
 
     expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
-
+    state = {}
     expt._apply_updates(
         {
             "ice_in": {"diagfreq": 720},
@@ -102,7 +102,8 @@ def test_apply_updates_with_correct_updaters(tmp_repo_dir, patch_updaters, indat
                     ]
                 }
             },
-        }
+        },
+        state=state,
     )
 
     assert f90_recorder.calls[0] == ("update_nml_params", {"diagfreq": 720}, "ice_in")
@@ -350,8 +351,49 @@ def test_apply_updates_strips_preserve_top_level_sets_empty_dict(tmp_repo_dir, i
     (f90_recorder, *_rest) = patch_updaters
 
     expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
-    expt._apply_updates({"ice/cice_in.nml": {"setup_nml": "PRESERVE"}})
+    state = {}
+    expt._apply_updates({"ice/cice_in.nml": {"setup_nml": "PRESERVE"}}, state=state)
 
     assert f90_recorder.calls == [
         ("update_nml_params", {}, "ice/cice_in.nml"),
     ]
+
+
+def test_apply_updates_hits_namelists_and_unknown_file(tmp_repo_dir, indata, patch_updaters):
+    (f90_recorder, *_rest) = patch_updaters
+    expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
+
+    state = {}
+    expt._apply_updates(
+        {
+            "namelists": {"grp": {"x": 1}},  # basename == "namelists" -> f90 updater
+            "weird.unknown": {"a": 1},  # no branch matches -> fallthrough path
+        },
+        state=state,
+    )
+
+    # only the "namelists" one should call f90 updater
+    assert f90_recorder.calls == [
+        ("update_nml_params", {"grp": {"x": 1}}, "namelists"),
+    ]
+
+
+def test_manage_control_expt_control_branch_missing_does_not_checkout(
+    tmp_repo_dir, indata, patch_git, checkout_recorder
+):
+    # control block exists, but repo.branches does NOT contain control branch
+    patch_git.repo.branches = []  # <- important: forces the if condition to be False
+
+    # create a real file so rglob finds it
+    (tmp_repo_dir / "config.yaml").write_text("jobname: x\n")
+
+    control_block = {"config.yaml": {"queue": "express"}}
+    expt = pert_exp.PerturbationExperiment(
+        directory=tmp_repo_dir,
+        indata={**indata, "Control_Experiment": control_block},
+    )
+
+    expt.manage_control_expt()
+
+    # should not call checkout_branch
+    assert checkout_recorder == []

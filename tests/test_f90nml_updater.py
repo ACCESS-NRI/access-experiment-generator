@@ -188,3 +188,35 @@ def test_turning_angle_preserve_keeps_existing_cos_sin(tmp_path):
     assert "turning_angle" not in parsed["dynamics_nml"]
     assert parsed["dynamics_nml"]["cosw"] == 0.1
     assert parsed["dynamics_nml"]["sinw"] == 0.2
+
+
+def test_turning_angle_in_dynamics_non_cice_file_does_not_touch_cos_sin(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    f = repo / "input.nml"  # NOT ice_in / cice_in.nml
+    f.write_text("&dynamics_nml\n  turning_angle = 10\n/\n")
+
+    updater = F90NamelistUpdater(repo)
+    updater.update_nml_params({"dynamics_nml": {"turning_angle": 30}}, f.name)
+
+    parsed = f90nml.read(f)
+
+    # turning_angle should be removed from group_value, but since it's not a CICE file,
+    # we should not compute cosw/sinw.
+    assert "cosw" not in parsed["dynamics_nml"]
+    assert "sinw" not in parsed["dynamics_nml"]
+
+
+def test_turning_angle_remove_when_dynamics_group_missing_is_noop(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    f = repo / "ice_in"
+    f.write_text("&grp\n  a = 1\n/\n")  # no dynamics_nml group
+
+    updater = F90NamelistUpdater(repo)
+    updater.update_nml_params({"dynamics_nml": {"turning_angle": "REMOVE"}}, f.name)
+
+    parsed = f90nml.read(f)
+    # group is ensured to exist, but cosw/sinw should not appear
+    assert "dynamics_nml" in parsed
+    assert parsed["dynamics_nml"] == {}
