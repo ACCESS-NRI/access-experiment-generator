@@ -87,16 +87,20 @@ jobs:
       - name: Install dependencies
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install '.[devel,test]'
+          python3 -m pip install -e '.[devel,test]'
 
       - name: Run tests with coverage
         run: |
           python3 -m pytest -s \
-            --cov=experiment_generator \
-            --cov-branch \
+            --cov \
+            --cov-config=.coveragerc \
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml \
             tests
+
+      - name: Check if tmp_parser is in coverage.xml
+        run: |
+          grep -n "tmp_parser" coverage.xml | head -n 10 || echo "tmp_parser not found in coverage.xml!"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
