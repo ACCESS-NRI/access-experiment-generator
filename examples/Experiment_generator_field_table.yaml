@@ -1,0 +1,106 @@
+# Experiment Configuration File
+# This file sets up parameters for both the control and perturbation experiments.
+# Adjust the settings below as needed for your environment and model.
+
+model_type: access-om2 # available models can be checked via `payu list`
+repository_url: git@github.com:ACCESS-NRI/access-om2-configs.git
+start_point: "fce24e3" # Control commit hash for new branches
+test_path: prototype-0.7.0_field_table # All control and perturbation experiment repositories will be created here; can be relative, absolute or ~ (user-defined)
+repository_directory: 1deg_jra55_ryf # Local directory name for the central repository (user-defined)
+
+control_branch_name: ctrl
+
+Control_Experiment:
+  ocean/field_table:
+    temp:  # field name
+      ocean_mod:  # model
+        prog_tracers:  # field_type
+          methods:
+            - REMOVE  # remove `horizontal-advection-scheme = mdppm`
+            - PRESERVE  # keep `vertical-advection-scheme = mdppm`
+            - key: restart_file  # change restart_file with ocean_temp_salt2.res.nc
+              value: ocean_temp_salt2.res.nc
+            - key: ppm_hlimiter # change ppm_hlimiter to 4
+              value: 4
+            # the leftover lines will be preserved automatically
+            # such as "ppm_vlimiter", "3" will be kept
+    sphum:
+      atmos_mod:
+        TRACER:
+          methods:
+            - PRESERVE
+            - PRESERVE
+            - key: profile_type
+              value: fixed
+              params:
+                surface_value: 1e-6
+
+    rayleigh_damp_table:
+      ocean_mod:
+        rayleigh_damp_table:
+          methods:
+            - PRESERVE
+            - PRESERVE
+            - PRESERVE
+            - REMOVE
+            - key: rayleigh
+              value: Torres
+              params:
+                itable: 0
+                jtable: 0
+                ktable_1: 0
+                ktable_2: 0
+                rayleigh_damp_table: 0
+
+
+Perturbation_Experiment:
+  Parameter_block1:
+    branches:
+      - perturb_1
+      # - perturb_2
+
+    ocean/field_table:
+      temp:  # field name
+        ocean_mod:  # model
+          prog_tracers:  # field_type
+            methods:
+              - - REMOVE
+                # - REMOVE
+                # - REMOVE
+                # - REMOVE
+
+      sphum:
+        atmos_mod:
+          TRACER:
+            methods:
+              - - PRESERVE
+                - PRESERVE
+                - key: profile_type
+                  value: fixed
+                  params:
+                    surface_value: 1.5e-6
+
+      rayleigh_damp_table:
+        ocean_mod:
+          rayleigh_damp_table:
+            methods:
+              - - REMOVE
+                - REMOVE
+                - REMOVE
+                - PRESERVE
+                - key: rayleigh
+                  value: Torres
+                  params:
+                    itable: 1
+                    jtable: 1
+                    ktable_1: 1
+                    ktable_2: 1
+                    rayleigh_damp_table: 1
+                - key: rayleigh
+                  value: Torres
+                  params:
+                    itable: 2
+                    jtable: 1
+                    ktable_1: 1
+                    ktable_2: 1
+                    rayleigh_damp_table: 1
