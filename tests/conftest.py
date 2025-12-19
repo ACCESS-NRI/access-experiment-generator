@@ -108,6 +108,11 @@ class Om2forcingRecorder(_RecorderBase):
         self._record("update_forcing_params", params, filename)
 
 
+class FieldTableRecorder(_RecorderBase):
+    def update_field_table_params(self, params, filename, state=None, **kwargs):
+        self._record("update_field_table_params", params, filename)
+
+
 @pytest.fixture(autouse=True)
 def patch_updaters(monkeypatch):
     """
@@ -119,6 +124,7 @@ def patch_updaters(monkeypatch):
     mom6_input_recorder = Mom6Recorder()
     nuopc_runseq_recorder = RunseqRecorder()
     om2_forcing_recorder = Om2forcingRecorder()
+    field_table_recorder = FieldTableRecorder()
 
     monkeypatch.setattr(pert_exp, "F90NamelistUpdater", lambda *_: f90_recorder)
     monkeypatch.setattr(pert_exp, "ConfigUpdater", lambda *_: payuconfig_recorder)
@@ -126,6 +132,7 @@ def patch_updaters(monkeypatch):
     monkeypatch.setattr(pert_exp, "Mom6InputUpdater", lambda *_: mom6_input_recorder)
     monkeypatch.setattr(pert_exp, "NuopcRunseqUpdater", lambda *_: nuopc_runseq_recorder)
     monkeypatch.setattr(pert_exp, "Om2ForcingUpdater", lambda *_: om2_forcing_recorder)
+    monkeypatch.setattr(pert_exp, "FieldTableUpdater", lambda *_: field_table_recorder)
 
     return (
         f90_recorder,
@@ -134,6 +141,7 @@ def patch_updaters(monkeypatch):
         mom6_input_recorder,
         nuopc_runseq_recorder,
         om2_forcing_recorder,
+        field_table_recorder,
     )
 
 

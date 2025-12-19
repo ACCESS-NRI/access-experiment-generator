@@ -198,7 +198,7 @@ def _merge_lists_positional(
 
         # If both sides exist and are mappings, recursively merge
         if have_base and isinstance(base0[i], Mapping) and isinstance(c, Mapping):
-            merged = base_list[i]
+            merged = deepcopy(base0[i])
             update_config_entries(merged, c, pop_key=pop_key, path=_path_join(path, f"[{i}]"), state=state)
             if not merged and pop_key:
                 continue

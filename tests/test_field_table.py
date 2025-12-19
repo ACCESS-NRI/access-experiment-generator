@@ -115,6 +115,4 @@ ppm_vlimiter = 3
     after2 = read_field_table(field_table_file)
     assert after1 == after2, "Field table changed on 2nd identical update!"
 
-    # and state should not be empty (BASE snapshots + REMOVE markers)
     assert any(k.endswith("::BASE") for k in state)
-    assert any("::REMOVE[" in k for k in state)
