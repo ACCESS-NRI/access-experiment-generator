@@ -1,0 +1,4 @@
+# https://coverage.readthedocs.io/en/latest/source.html#source
+[run]
+omit =
+    src/experiment_generator/tmp_parser/**
