@@ -1,4 +1,4 @@
-from experiment_generator.field_table_updater import FieldTableUpdater
+from experiment_generator.field_table_updater import FieldTableUpdater, prune_empty_field_table_config
 from experiment_generator.tmp_parser.field_table import read_field_table
 from experiment_generator.common_var import REMOVED, PRESERVED
 
@@ -116,3 +116,25 @@ ppm_vlimiter = 3
     assert after1 == after2, "Field table changed on 2nd identical update!"
 
     assert any(k.endswith("::BASE") for k in state)
+
+
+def test_prune_empty_field_table_config_deletes_empty_entries():
+    config = {
+        "rayleigh_damp_table": {
+            "ocean_mod": {
+                "rayleigh_damp_table": {"methods": []},  # now should be deleted
+            }
+        },
+        "temp": {
+            "ocean_mod": {
+                "prog_tracers": {"methods": [{"key": "k", "value": "v"}]},
+            }
+        },
+    }
+
+    prune_empty_field_table_config(config)
+
+    assert "rayleigh_damp_table" not in config
+    assert "temp" in config
+    assert "ocean_mod" in config["temp"]
+    assert "prog_tracers" in config["temp"]["ocean_mod"]
