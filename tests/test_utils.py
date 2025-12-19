@@ -419,9 +419,8 @@ def test_merge_lists_positional_mapping_branch_uses_current_mapping_slot():
         pop_key=True,
     )
 
-    # Crucial assertion: the merged mapping is literally the same object as base_list[0]
-    # This proves line 203 "merged = base_list[i]" ran.
-    assert out[0] is base_list[0]
+    # out[0] is now a new mapping, not the same as base_list[0]
+    assert out[0] is not base_list[0]
 
     # And content merged as expected
     assert out == [{"a": 1, "keep": 0, "b": 2}]

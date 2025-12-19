@@ -79,6 +79,7 @@ def test_apply_updates_with_correct_updaters(tmp_repo_dir, patch_updaters, indat
         mom6_input_recorder,
         nuopc_runseq_recorder,
         om2_forcing_recorder,
+        field_table_recorder,
     ) = patch_updaters
 
     expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
@@ -100,6 +101,20 @@ def test_apply_updates_with_correct_updaters(tmp_repo_dir, patch_updaters, indat
                             "value": "test_data/temporal.RYF.rsds.1990_1991.nc",
                         }
                     ]
+                }
+            },
+            "field_table": {
+                "temp": {
+                    "ocean_mod": {
+                        "prog_tracers": {
+                            "methods": [
+                                {
+                                    "key": "restart_file",
+                                    "value": "ocean_temp_salt2.res.nc",
+                                }
+                            ]
+                        }
+                    }
                 }
             },
         },
@@ -130,6 +145,24 @@ def test_apply_updates_with_correct_updaters(tmp_repo_dir, patch_updaters, indat
             }
         },
         "atmosphere/forcing.json",
+    )
+    assert field_table_recorder.calls[0] == (
+        "update_field_table_params",
+        {
+            "temp": {
+                "ocean_mod": {
+                    "prog_tracers": {
+                        "methods": [
+                            {
+                                "key": "restart_file",
+                                "value": "ocean_temp_salt2.res.nc",
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        "field_table",
     )
 
 
@@ -177,7 +210,7 @@ def test_manage_perturb_expt_creat_branches_applies_updates_and_commits(
         directory=tmp_repo_dir, indata={**indata, "Perturbation_Experiment": perturb_block}
     )
 
-    f90_recorder, payuconfig_recorder, _, _, _, _ = patch_updaters
+    f90_recorder, payuconfig_recorder, _, _, _, _, _ = patch_updaters
 
     expt.manage_perturb_expt()
 
