@@ -111,16 +111,8 @@ def _clean_removes(x, *, pop_key: bool) -> object:
     return x
 
 
-def _remove_first_occurrence(seq: list, target) -> bool:
-    """
-    Remove the first element equal to target from seq.
-    Returns True if removed, False if not found.
-    """
-    for i, x in enumerate(seq):
-        if x == target:
-            seq.pop(i)
-            return True
-    return False
+class PositionalMergeError(ValueError):
+    pass
 
 
 def _merge_lists_positional(
@@ -149,10 +141,9 @@ def _merge_lists_positional(
     if state is None:
         state = {}
 
-    # comment out this for remove state store support
-    # # If every element in change_list is "REMOVE", remove the whole thing
-    # if change_list and all(_is_removed_str(c) for c in change_list):
-    #     return None
+    # If every element in change_list is "REMOVE", remove the whole thing
+    if change_list and len(change_list) == len(base_list) and all(_is_removed_str(c) for c in change_list):
+        return None
 
     base_key = f"{path}::BASE"
     if base_key not in state:
@@ -160,28 +151,34 @@ def _merge_lists_positional(
         state[base_key] = deepcopy(base_list)
     base0 = state[base_key]  # stable baseline for all runs
 
+    def _baseline_slot(i: int):
+        """
+        Keep baseline results deterministic across runs.
+        """
+        return deepcopy(base0[i])
+
     out = type(base_list)()
     max_len = max(len(base0), len(change_list))
-
-    # Collect removal targets in order (one per REMOVE marker)
-    removal_targets = []
 
     # walk both lists by index, building a new list.
     for i in range(max_len):
         have_base = i < len(base0)
-        have_base_cur = i < len(base_list)
         have_change = i < len(change_list)
 
         if not have_change:
             # keep remainder of base as-is
-            if have_base:
-                if have_base_cur and isinstance(base_list[i], Mapping):
-                    out.append(base_list[i])
-                else:
-                    out.append(base0[i])
+            out.append(_baseline_slot(i))
             continue
 
         c = change_list[i]
+
+        if not have_base and (_is_removed_str(c) or _is_preserved_str(c)):
+            raise PositionalMergeError(
+                f"\n -- {path}[{i}]: {c!r} refers to a non-existent baseline slot "
+                f"(baseline length={len(base0)}). \n"
+                "    -- Please check the number of REMOVE/PRESERVE markers "
+                "in your YAML input file!"
+            )
 
         # # {} or "PRESERVE" -> no-op for this slot
         # TODO: not sure for this now??
@@ -191,26 +188,18 @@ def _merge_lists_positional(
         #     continue
 
         if _is_preserved_str(c):
-            if have_base:
-                if have_base_cur and isinstance(base_list[i], Mapping):
-                    out.append(base_list[i])
-                else:
-                    out.append(base0[i])
+            out.append(_baseline_slot(i))
             # if no base slot, do nothing (don't append "PRESERVE")
             continue
 
         # Drop this slot if "REMOVE"
         if _is_removed_str(c):
-            state_key = _remove_state_key(path, i)
-            if state_key not in state and have_base:
-                state[state_key] = base0[i]
-            if state_key in state:
-                removal_targets.append(state[state_key])
             continue
 
         # If both sides exist and are mappings, recursively merge
         if have_base and isinstance(base0[i], Mapping) and isinstance(c, Mapping):
-            merged = base_list[i]
+            if i < len(base_list) and isinstance(base_list[i], Mapping):
+                merged = base_list[i]
             update_config_entries(merged, c, pop_key=pop_key, path=_path_join(path, f"[{i}]"), state=state)
             if not merged and pop_key:
                 continue
@@ -218,9 +207,9 @@ def _merge_lists_positional(
             continue
 
         # If both sides exist and are lists, recursively merge lists
-        if have_base_cur and isinstance(base_list[i], list) and isinstance(c, list):
+        if have_base and isinstance(base0[i], list) and isinstance(c, list):
             out.append(
-                _merge_lists_positional(base_list[i], c, path=_path_join(path, f"[{i}]"), state=state, pop_key=pop_key)
+                _merge_lists_positional(base0[i], c, path=_path_join(path, f"[{i}]"), state=state, pop_key=pop_key)
             )
             continue
 
@@ -231,9 +220,9 @@ def _merge_lists_positional(
             continue
         out.append(cleaned)
 
-    # Remove exactly one occurrence per remembered removal marker.
-    for target in removal_targets:
-        _remove_first_occurrence(out, target)
+    # If pop_key and list becomes empty, then delete the whole list
+    if pop_key and len(out) == 0:
+        return []
 
     return out
 
@@ -292,6 +281,10 @@ def update_config_entries(
             # inplace update to preserve formatting and comments
             base_list = base[k]
 
+            # if nothing changes then do nothing to preserve formatting
+            if base_list == merged:
+                continue
+
             # overwrite existing slots
             n = min(len(base_list), len(merged))
             for i in range(n):
@@ -312,10 +305,10 @@ def update_config_entries(
         if k in cleaned:
             val = cleaned[k]
             if pop_key:
-                # if isinstance(val, Mapping) and not val:
-                #     # special case: cleaned to empty mapping and pop_key=True -> remove key
-                #     base.pop(k, None)
-                #     continue
+                if isinstance(val, Mapping) and not val:
+                    # special case: cleaned to empty mapping and pop_key=True -> remove key
+                    base.pop(k, None)
+                    continue
                 if isinstance(val, Sequence) and not isinstance(val, str) and len(val) == 0:
                     # special case: cleaned to empty sequence and pop_key=True -> remove key
                     base.pop(k, None)
