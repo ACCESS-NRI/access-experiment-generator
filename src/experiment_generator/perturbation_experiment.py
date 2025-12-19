@@ -104,6 +104,8 @@ class PerturbationExperiment(BaseExperiment):
                 config_path=self.directory / "config.yaml",
             )
 
+        state = self.state_store.load_state(self.control_branch_name)
+
         # Walk the repo, skipping un-interesting dirs
         exclude_dirs = {".git", ".github", "testing", "docs"}
         for file in self.directory.rglob("*"):
@@ -113,7 +115,10 @@ class PerturbationExperiment(BaseExperiment):
             # eg, ice/cice_in.nml or ice_in.nml
             yaml_data = control_data.get(str(rel_path))
             if yaml_data:
-                self._apply_updates({str(rel_path): yaml_data})
+                self._apply_updates({str(rel_path): yaml_data}, state=state)
+
+        # save state after updates
+        self.state_store.save_state(self.control_branch_name, state)
 
         # Commit if anything actually changed
         modified_files = [item.a_path for item in self.gitrepository.repo.index.diff(None)]
