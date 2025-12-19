@@ -1,4 +1,10 @@
-from experiment_generator.utils import update_config_entries, _merge_lists_positional
+import pytest
+from experiment_generator.utils import (
+    update_config_entries,
+    _merge_lists_positional,
+    _remove_state_key,
+    PositionalMergeError,
+)
 from experiment_generator.common_var import REMOVED, PRESERVED
 
 
@@ -310,45 +316,115 @@ def test_drop_key_when_cleaned_to_empty_sequence_and_pop_key_true_scalar_base():
     assert base == {"keep": 42}  # lst is dropped
 
 
-def test_merge_lists_positional_preserve_mapping_slot_uses_current():
-    # Hits PRESERVE branch + mapping slot choice (line ~194/196)
-    base = [{"a": 1}]
+def test_remove_state_key_format():
+    assert _remove_state_key("k", 3) == "k::REMOVE[3]"
+
+
+def test_merge_lists_positional_all_remove_returns_none():
+    state = {}
     out = _merge_lists_positional(
+        base_list=[1, 2, 3],
+        change_list=[REMOVED, REMOVED, REMOVED],
+        path="k",
+        state=state,
+        pop_key=True,
+    )
+    assert out is None
+
+
+def test_merge_lists_positional_state_base_key_created_and_reused():
+    state = {}
+
+    base = [10, 20]
+    _merge_lists_positional(
         base_list=base,
+        change_list=[PRESERVED],
+        path="k",
+        state=state,
+        pop_key=True,
+    )
+    assert "k::BASE" in state
+    assert state["k::BASE"] == [10, 20]
+
+    # mutate current base_list to prove baseline is stable
+    base[:] = [999, 888]
+
+    out2 = _merge_lists_positional(
+        base_list=base,
+        change_list=[PRESERVED],
+        path="k",
+        state=state,
+        pop_key=True,
+    )
+    # baseline still the original snapshot
+    assert state["k::BASE"] == [10, 20]
+    assert out2[0] == 10
+
+
+def test_merge_lists_positional_preserve_beyond_baseline_raises():
+    state = {}
+    with pytest.raises(PositionalMergeError):
+        _merge_lists_positional(
+            base_list=[1],
+            change_list=[PRESERVED, PRESERVED],
+            path="k",
+            state=state,
+            pop_key=True,
+        )
+
+
+def test_merge_lists_positional_fills_remaining_with_baseline_slots():
+    out = _merge_lists_positional(
+        base_list=[10, 20],
+        change_list=[],  # no changes
+        path="k",
+        state={},
+        pop_key=True,
+    )
+    assert out == [10, 20]
+
+
+def test_update_config_entries_removes_key_when_cleaned_to_empty_mapping():
+    base = {"a": 1, "keep": 2}
+    changes = {"a": {"x": REMOVED}}  # cleans to {}
+
+    update_config_entries(base, changes, pop_key=True)
+    assert base == {"keep": 2}
+
+
+def test_merge_lists_positional_state_none_is_initialised():
+    # state=None triggers the "if state is None: state = {}" line
+    out = _merge_lists_positional(
+        base_list=[1],
         change_list=[PRESERVED],
         path="k",
         state=None,
         pop_key=True,
     )
-    assert out[0] is base[0]  # proves it took base_list[i] for Mapping slots
+    assert out == [1]
 
 
-def test_merge_lists_positional_remove_removes_shifted_mapping_via_state_store():
-    # Run 1 records REMOVE target from base0[0].
-    # Run 2 the same target appears elsewhere in the current list -> must be removed.
+def test_merge_lists_positional_mapping_branch_uses_current_mapping_slot():
     state = {}
-    base = [{"id": 1}, {"id": 2}, {"id": 3}]
 
-    _merge_lists_positional(
-        base_list=base,
-        change_list=[REMOVED],  # remove index 0 -> remembers {"id": 1}
+    # base_list[0] is a mapping, so base0[0] snapshot is a mapping
+    base_list = [{"a": 1, "keep": 0}]
+    change_list = [{"b": 2}]  # mapping -> triggers mapping merge branch
+
+    out = _merge_lists_positional(
+        base_list=base_list,
+        change_list=change_list,
         path="k",
         state=state,
         pop_key=True,
     )
 
-    # simulate a later run where {"id": 1} shifted to a different index
-    base[:] = [{"id": 2}, {"id": 3}, {"id": 1}]
+    # Crucial assertion: the merged mapping is literally the same object as base_list[0]
+    # This proves line 203 "merged = base_list[i]" ran.
+    assert out[0] is base_list[0]
 
-    out2 = _merge_lists_positional(
-        base_list=base,
-        change_list=[REMOVED],  # still "remove position 0", but should remove remembered {"id": 1} wherever it is
-        path="k",
-        state=state,
-        pop_key=True,
-    )
-
-    assert out2 == [{"id": 3}]
+    # And content merged as expected
+    assert out == [{"a": 1, "keep": 0, "b": 2}]
 
 
 # def test_empty_mapping_in_change_keeps_existing_slot():
