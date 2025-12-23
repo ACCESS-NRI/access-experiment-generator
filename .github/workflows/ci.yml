@@ -2,8 +2,16 @@ name: CI
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      # These are ignored because they don't have anything to do with the model itself
+      - documentation/**
+      - .github/**
   pull_request:
     branches: [ main ]
+    paths-ignore:
+      # These are ignored because they don't have anything to do with the model itself
+      - documentation/**
+      - .github/**
   workflow_dispatch:
 
 env:
