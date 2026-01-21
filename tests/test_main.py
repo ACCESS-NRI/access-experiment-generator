@@ -41,13 +41,11 @@ def test_main_uses_default_yaml_when_present(tmp_path, monkeypatch):
     import experiment_generator.main as main_module
 
     default_yaml = tmp_path / "Experiment_generator.yaml"
-    default_yaml.write_text(
-        f"""
+    default_yaml.write_text(f"""
 repository_directory: test_repo
 control_branch_name: ctrl
 model_type: {VALID_MODELS[1]}
-"""
-    )
+""")
 
     monkeypatch.chdir(tmp_path)
 

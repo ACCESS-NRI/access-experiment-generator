@@ -53,14 +53,12 @@ def test_update_nuopc_runseq_replace_block_only(tmp_path):
         "runSeq::\n" "@1100\n" "  MED do_something\n" "  OCN do_something\n" "@\n" "::\n",
     )
 
-    new_block = dedent(
-        """
+    new_block = dedent("""
         @1.0
           MED do_something2
           OCN
         @
-        """
-    )
+        """)
 
     updater = NuopcRunseqUpdater(repo_dir)
     params = {"runseq_block": new_block}
