@@ -1,7 +1,6 @@
 from pathlib import Path
 import re
 
-
 HEADER_PATTERN = re.compile(r'^\s*"([^"]*)"\s*,\s*"([^"]*)"\s*,\s*"([^"]*)"\s*$')
 THREE_STRINGS_PATTERN = re.compile(r'^\s*"([^"]*)"\s*,\s*"([^"]*)"\s*,\s*"([^"]*)"\s*$')
 TWO_STRINGS_PATTERN = re.compile(r'^\s*"([^"]*)"\s*,\s*"([^"]*)"\s*$')

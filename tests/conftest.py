@@ -151,8 +151,7 @@ def tmp_repo_dir(tmp_path: Path) -> Path:
     (tmp_path / ".github").mkdir()
     (tmp_path / "testing").mkdir()
     (tmp_path / "docs").mkdir()
-    (tmp_path / "config.yaml").write_text(
-        """
+    (tmp_path / "config.yaml").write_text("""
 queue: normal
 ncpus: 240
 jobfs: 10GB
@@ -160,30 +159,24 @@ mem: 960GB
 walltime: 02:00:00
 jobname: 100km_jra55do_ryf
 model: access-om3
-        """
-    )
-    (tmp_path / "input.nml").write_text(
-        """
+        """)
+    (tmp_path / "input.nml").write_text("""
 &MOM_input_nml
     output_directory = './'
     restart_input_dir = './'
     restart_output_dir = './'
     parameter_filename = 'MOM_input', 'MOM_override'
 /
-        """
-    )
-    (tmp_path / "ice_in").write_text(
-        """
+        """)
+    (tmp_path / "ice_in").write_text("""
 &setup_nml
   bfbflag = "off"
   conserv_check = .false.
   diagfreq = 960
   dumpfreq = "x"
   histfreq = "d", "m", "x", "x", "x"
-/        """
-    )
-    (tmp_path / "nuopc.runseq").write_text(
-        """
+/        """)
+    (tmp_path / "nuopc.runseq").write_text("""
 runSeq::
 @3600
   MED med_phases_aofluxes_run
@@ -192,20 +185,16 @@ runSeq::
   MED med_phases_diag_ocn
 @
 ::
-    """
-    )
-    (tmp_path / "nuopc.runconfig").write_text(
-        """
+    """)
+    (tmp_path / "nuopc.runconfig").write_text("""
 component_list: MED ATM ICE OCN ROF
 ALLCOMP_attributes::
      ATM_model = datm
      GLC_model = sglc
      ICE_model = cice
 ::
-        """
-    )
-    (tmp_path / "MOM_input").write_text(
-        """
+        """)
+    (tmp_path / "MOM_input").write_text("""
 THICKNESSDIFFUSE_FIRST = True   !   [Boolean] default = False
                                 ! If true, do thickness diffusion or interface height smoothing before dynamics.
                                 ! This is only used if THICKNESSDIFFUSE or APPLY_INTERFACE_FILTER is true.
@@ -213,11 +202,9 @@ DT = 1800.0                     !   [s]
                                 ! The (baroclinic) dynamics time step.  The time-step that is actually used will
                                 ! be an integer fraction of the forcing time-step (DT_FORCING in ocean-only mode
                                 ! or the coupling timestep in coupled mode.)
-        """
-    )
+        """)
     (tmp_path / "atmosphere").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "atmosphere" / "forcing.json").write_text(
-        """
+    (tmp_path / "atmosphere" / "forcing.json").write_text("""
 {
   "description": "JRA55-do v1.4.0 IAF forcing",
   "inputs": [
@@ -235,6 +222,5 @@ DT = 1800.0                     !   [s]
     }
   ]
 }
-"""
-    )
+""")
     return tmp_path

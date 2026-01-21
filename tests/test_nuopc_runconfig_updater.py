@@ -8,15 +8,13 @@ def test_update_runconfig_params_updates_and_removes(tmp_path):
     repo_dir.mkdir()
 
     runconfig_path = repo_dir / "nuopc.runconfig"
-    runconfig_path.write_text(
-        """
+    runconfig_path.write_text("""
 PELAYOUT_attributes::
      atm_ntasks = 364
      atm_nthreads = 2
      atm_pestride = 2
      atm_rootpe = 0
-    """
-    )
+    """)
 
     updater = NuopcRunConfigUpdater(repo_dir)
 

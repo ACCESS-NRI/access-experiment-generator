@@ -381,7 +381,7 @@ def test_extract_run_specific_params_raises_on_list_of_dicts_inconsistent_outer_
 def test_apply_updates_strips_preserve_top_level_sets_empty_dict(tmp_repo_dir, indata, patch_updaters):
     # TODO: remove this test when f90nml_updater.update_nml_params uses update_config_entries()
     # after access-parsers implements it.
-    (f90_recorder, *_rest) = patch_updaters
+    f90_recorder, *_rest = patch_updaters
 
     expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
     state = {}
@@ -393,7 +393,7 @@ def test_apply_updates_strips_preserve_top_level_sets_empty_dict(tmp_repo_dir, i
 
 
 def test_apply_updates_hits_namelists_and_unknown_file(tmp_repo_dir, indata, patch_updaters):
-    (f90_recorder, *_rest) = patch_updaters
+    f90_recorder, *_rest = patch_updaters
     expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
 
     state = {}

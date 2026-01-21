@@ -8,8 +8,7 @@ def test_update_field_table_params_add_change_remove(tmp_path):
     repo_dir.mkdir()
 
     field_table_file = repo_dir / "field_table"
-    field_table_file.write_text(
-        """
+    field_table_file.write_text("""
 "prog_tracers","ocean_mod","temp"
 horizontal-advection-scheme = mdppm
 vertical-advection-scheme = mdppm
@@ -31,8 +30,7 @@ ppm_vlimiter = 3
 "rayleigh","Torres","itable=62,jtable=107,ktable_1=1,ktable_2=50,rayleigh_damp_table=5400"
 "rayleigh","Torres","itable=62,jtable=108,ktable_1=1,ktable_2=50,rayleigh_damp_table=5400"
 "rayleigh","Torres","itable=62,jtable=109,ktable_1=1,ktable_2=50,rayleigh_damp_table=5400"/
-    """
-    )
+    """)
 
     updater = FieldTableUpdater(repo_dir)
 

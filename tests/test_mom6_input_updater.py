@@ -7,8 +7,7 @@ def test_update_mom6_params_add_change_remove(tmp_path):
     repo_dir.mkdir()
 
     mom_file = repo_dir / "MOM_input"
-    mom_file.write_text(
-        """
+    mom_file.write_text("""
 DT = 900.0                      !   [s]
                                 ! The (baroclinic) dynamics time step.  The time-step that is actually used will
                                 ! be an integer fraction of the forcing time-step (DT_FORCING in ocean-only mode
@@ -18,8 +17,7 @@ DT_THERM = 7200.0               !   [s] default = 900.0
                                 ! an integer multiple of DT and less than the forcing or coupling time-step,
                                 ! unless THERMO_SPANS_COUPLING is true, in which case DT_THERM can be an integer
                                 ! multiple of the coupling timestep.  By default DT_THERM is set to DT.
-    """
-    )
+    """)
 
     updater = Mom6InputUpdater(repo_dir)
 

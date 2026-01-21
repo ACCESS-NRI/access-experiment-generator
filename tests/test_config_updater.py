@@ -10,12 +10,10 @@ def test_update_config_params_update_params_and_jobname_warning(tmp_path, capsys
     rel_path = Path("config.yaml")
     config_path = repo_dir / rel_path
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(
-        """
+    config_path.write_text("""
     jobname: existing_job_name
     queue: normalsr
-    """
-    )
+    """)
 
     updater = ConfigUpdater(repo_dir)
 
