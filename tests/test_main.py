@@ -116,3 +116,14 @@ def test_exec_main(tmp_path, monkeypatch):
 
     assert called.get("run") is True
     assert called["indata"]["model_type"] == VALID_MODELS[0]
+
+
+def test_get_version_fails(monkeypatch):
+    import experiment_generator.main as main_module
+
+    def raise_not_found(_name):
+        raise main_module.PackageNotFoundError
+
+    monkeypatch.setattr(main_module, "version", raise_not_found, raising=True)
+
+    assert main_module.get_version() == "unknown"
