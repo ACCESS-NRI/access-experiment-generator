@@ -1,8 +1,19 @@
 import argparse
 import os
+from importlib.metadata import version, PackageNotFoundError
 
 from .tmp_parser.yaml_config import read_yaml
 from .experiment_generator import ExperimentGenerator
+
+
+def get_version() -> str:
+    """
+    Retrieve the current version of ACCESS Experiment Generator
+    """
+    try:
+        return version("experiment-generator")
+    except PackageNotFoundError:
+        return "unknown"
 
 
 def main():
@@ -19,6 +30,7 @@ def main():
     """
 
     parser = argparse.ArgumentParser(
+        prog="ACCESS Experiment Generator",
         description=(
             "Manage ACCESS experiments using configurable YAML input.\n"
             "If no YAML file is specified, the tool will look for 'Experiment_generator.yaml' "
@@ -36,6 +48,14 @@ def main():
             "Path to the YAML file specifying parameter values for experiment runs.\n"
             "Defaults to 'Experiment_generator.yaml' if present in the current directory."
         ),
+    )
+
+    parser.add_argument(
+        "-v",
+        "--version",
+        action="version",
+        version=f"%(prog)s {get_version()}",
+        help="Show the version of ACCESS Experiment Generator",
     )
 
     args = parser.parse_args()
