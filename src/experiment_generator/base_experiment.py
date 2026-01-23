@@ -21,7 +21,7 @@ class BaseExperiment:
         self.repo_dir = indata.get("repository_directory")
         self.directory = (self.test_path / self.repo_dir).resolve()
         self.existing_branch = indata.get("existing_branch", None)
-        self.control_branch_name = indata.get("control_branch_name", False)
+        self.control_branch_name = indata.get("control_branch_name", "ctrl")
         self.keep_uuid = indata.get("keep_uuid", False)
 
         # Restart and configuration paths
