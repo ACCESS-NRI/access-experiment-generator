@@ -22,7 +22,7 @@ def test_base_experiment_defaults_and_paths(tmp_path, monkeypatch):
     assert base.repo_dir == "test_repo"
     assert base.directory == (base.test_path / "test_repo").resolve()
     assert base.existing_branch is None
-    assert base.control_branch_name is False
+    assert base.control_branch_name == "ctrl"
     assert base.keep_uuid is False
 
     # Restart and configuration paths
