@@ -72,7 +72,8 @@ class PerturbationExperiment(BaseExperiment):
                 params = {}
 
             if filename.endswith("_in") or filename.endswith(".nml") or os.path.basename(filename) == "namelists":
-                self.f90namelistupdater.update_nml_params(params, filename, state=state)
+                # Fortran namelist does not contain nested lists hence state store is not required here
+                self.f90namelistupdater.update_nml_params(params, filename)
             elif filename.endswith(".yaml"):
                 self.configupdater.update_config_params(params, filename, state=state)
             elif filename == "nuopc.runconfig":
