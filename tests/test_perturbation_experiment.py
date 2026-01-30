@@ -238,8 +238,8 @@ def test_manage_perturb_expt_creat_branches_applies_updates_and_commits(
     "param_dict, indx, total, expected",
     [
         # broadcast single list value across branches
-        ({"queue": ["normal"]}, 0, 2, {"queue": "normal"}),
-        ({"queue": ["normal"]}, 1, 2, {"queue": "normal"}),
+        ({"queue": ["normal"]}, 0, 2, {"queue": ["normal"]}),
+        ({"queue": ["normal"]}, 1, 2, {"queue": ["normal"]}),
         # broadcast single plain value across branches
         ({"cpl_dt": 3600}, 0, 2, {"cpl_dt": 3600}),
         ({"cpl_dt": 3600}, 1, 2, {"cpl_dt": 3600}),
@@ -250,11 +250,11 @@ def test_manage_perturb_expt_creat_branches_applies_updates_and_commits(
         ({"manifest": {"reproduce": {"exe": ["exe1", "exe2"]}}}, 0, 2, {"manifest": {"reproduce": {"exe": "exe1"}}}),
         ({"manifest": {"reproduce": {"exe": ["exe1", "exe2"]}}}, 1, 2, {"manifest": {"reproduce": {"exe": "exe2"}}}),
         # broadcast single nested dict for two branches
-        ({"metadata": {"enable": [True]}}, 0, 2, {"metadata": {"enable": True}}),
-        ({"metadata": {"enable": [True]}}, 1, 2, {"metadata": {"enable": True}}),
+        ({"metadata": {"enable": [True]}}, 0, 2, {"metadata": {"enable": [True]}}),
+        ({"metadata": {"enable": [True]}}, 1, 2, {"metadata": {"enable": [True]}}),
         # broadcast single 2-layers nested dict for two branches
-        ({"manifest": {"reproduce": {"exe": ["exe1"]}}}, 0, 2, {"manifest": {"reproduce": {"exe": "exe1"}}}),
-        ({"manifest": {"reproduce": {"exe": ["exe1"]}}}, 1, 2, {"manifest": {"reproduce": {"exe": "exe1"}}}),
+        ({"manifest": {"reproduce": {"exe": ["exe1"]}}}, 0, 2, {"manifest": {"reproduce": {"exe": ["exe1"]}}}),
+        ({"manifest": {"reproduce": {"exe": ["exe1"]}}}, 1, 2, {"manifest": {"reproduce": {"exe": ["exe1"]}}}),
         # list of lists - single one inner list: broadcast inner list
         ({"modules": {"use": [[["/g/data/vk83/modules"]]]}}, 0, 2, {"modules": {"use": [["/g/data/vk83/modules"]]}}),
         ({"modules": {"use": [[["/g/data/vk83/modules"]]]}}, 1, 2, {"modules": {"use": [["/g/data/vk83/modules"]]}}),
@@ -277,8 +277,8 @@ def test_manage_perturb_expt_creat_branches_applies_updates_and_commits(
         # _filter_value: _is_remove_str(x)
         ({"queue": "REMOVE"}, 0, 2, {"queue": "REMOVE"}),
         ({"queue": "REMOVE"}, 1, 2, {"queue": "REMOVE"}),
-        ({"queue": ["REMOVE"]}, 0, 1, {"queue": "REMOVE"}),
-        ({"queue": ["REMOVE"]}, 0, 2, {"queue": "REMOVE"}),
+        ({"queue": ["REMOVE"]}, 0, 1, {"queue": ["REMOVE"]}),
+        ({"queue": ["REMOVE"]}, 0, 2, {"queue": ["REMOVE"]}),
         # list of empty lists: collapse to empty dict
         ({"queue": [[]]}, 0, 2, {}),
         ({"queue": [[], {"keep": 1}]}, 1, 2, {"queue": {"keep": 1}}),
@@ -311,8 +311,8 @@ def test_manage_perturb_expt_creat_branches_applies_updates_and_commits(
         ({"queue": "PRESERVE"}, 0, 2, {"queue": "PRESERVE"}),
         ({"queue": "PRESERVE"}, 1, 2, {"queue": "PRESERVE"}),
         # single-item list [PRESERVE]
-        ({"queue2": ["PRESERVE"]}, 0, 2, {"queue2": "PRESERVE"}),
-        ({"queue2": ["PRESERVE"]}, 1, 2, {"queue2": "PRESERVE"}),
+        ({"queue2": ["PRESERVE"]}, 0, 2, {"queue2": ["PRESERVE"]}),
+        ({"queue2": ["PRESERVE"]}, 1, 2, {"queue2": ["PRESERVE"]}),
         # mapping whose only child is PRESERVE
         ({"outer": {"x": "PRESERVE"}}, 0, 2, {"outer": {"x": "PRESERVE"}}),
         ({"outer": {"x": "PRESERVE"}}, 1, 2, {"outer": {"x": "PRESERVE"}}),

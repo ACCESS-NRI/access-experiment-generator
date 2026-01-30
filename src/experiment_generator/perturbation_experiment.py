@@ -364,7 +364,8 @@ class PerturbationExperiment(BaseExperiment):
                 if len(value) == 1 or (len(value) > 1 and all(i == value[0] for i in value)):
                     keep_v, sel = _select_from_list(value[0])
                     if keep_v:
-                        result[key] = sel
+                        result[key] = [sel]
+                        continue
                 else:
                     if len(value) != total_exps:
                         raise ValueError(
