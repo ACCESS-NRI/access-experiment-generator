@@ -322,6 +322,19 @@ def test_manage_perturb_expt_creat_branches_applies_updates_and_commits(
         # sequence branch: inner list is [PRESERVE]
         ({"queue3": [["PRESERVE"]]}, 0, 2, {"queue3": ["PRESERVE"]}),
         ({"queue3": [["PRESERVE"]]}, 1, 2, {"queue3": ["PRESERVE"]}),
+        # mixed positional list of lists with markers and mappings and scalars
+        (
+            {"submodels": [["PRESERVE", {}, "foo"]]},
+            0,
+            2,
+            {"submodels": ["PRESERVE", None, "foo"]},
+        ),
+        (
+            {"submodels": [["REMOVE", {}, "foo"]]},
+            1,
+            2,
+            {"submodels": ["REMOVE", None, "foo"]},
+        ),
     ],
 )
 def test_extract_run_specific_params_rules(tmp_repo_dir, indata, param_dict, indx, total, expected):

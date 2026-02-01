@@ -426,6 +426,16 @@ def test_merge_lists_positional_mapping_branch_uses_current_mapping_slot():
     assert out == [{"a": 1, "keep": 0, "b": 2}]
 
 
+def test_update_config_entries_unwraps_single_item_list_to_scalar_when_base_is_scalar():
+    base = {"ncpus": 4}
+
+    changes = {"ncpus": [8]}  # single-item list
+
+    update_config_entries(base, changes, pop_key=True)
+
+    assert base == {"ncpus": 8}
+
+
 # def test_empty_mapping_in_change_keeps_existing_slot():
 #     base = {"lst": [{"a": 1}, {"b": 2}]}
 #     # empty mapping also means PRESERVE
