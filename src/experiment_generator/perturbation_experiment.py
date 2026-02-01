@@ -340,6 +340,27 @@ class PerturbationExperiment(BaseExperiment):
                         if isinstance(inner, list) and len(inner) == 0:
                             continue
 
+                        # handle mixed positional inventories, such as [PRESERVE, {input: ...}]
+                        if any(isinstance(d, Mapping) for d in inner):
+                            slots = []
+                            for i in inner:
+                                # keep markers as is
+                                if _is_removed_str(i) or _is_preserved_str(i):
+                                    slots.append(i)
+                                    continue
+
+                                # recurse into dicts
+                                if isinstance(i, Mapping):
+                                    keep_v, cleaned = _filter_value(
+                                        self._extract_run_specific_params(i, indx, total_exps)
+                                    )
+                                    slots.append(cleaned if keep_v else {})
+                                    continue
+
+                                # scalar slots
+                                slots.append(i)
+
+                        # inner is all dicts
                         if all(isinstance(d, Mapping) for d in inner):
                             # recurse for each dict
                             items = []

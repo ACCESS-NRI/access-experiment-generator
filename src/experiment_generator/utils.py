@@ -262,6 +262,11 @@ def update_config_entries(
         if not should_apply:
             continue  # no change for this key; keep existing value
 
+        # if the incoming value is a single value list but the base value is scalar,
+        # then treat it as a scalar.
+        if isinstance(v, list) and len(v) == 1 and not isinstance(base.get(k), list):
+            v = v[0]
+
         key_path = _path_join(path, str(k))
 
         if isinstance(v, Mapping) and isinstance(base.get(k), Mapping):
