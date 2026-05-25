@@ -36,6 +36,9 @@ concurrency:
 
   # ========== You should not need to modify anything below this ============ #
 
+env:
+  PIP_UPLOADED_PRIOR_TO: P7D
+
 jobs:
   # The conditionals cannot depend directly from the GitHub environment (e.g., if: env.BUILD_DEVELOPMENT_WEBSITE == 'true') 
   # so we use a job to set that as an output that can be then used in the other jobs' conditionals
