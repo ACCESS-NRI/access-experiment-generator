@@ -17,6 +17,10 @@ The **ACCESS Experiment Generator** is a tool for creating **ensembles of model 
 
 Each generated branch is immediately `Payu`-ready — you can step into the branch directory and launch runs on Gadi, NCI using [`Payu`](https://github.com/payu-org/payu).
 
+## Documentation
+The ACCESS experient generator documentation can be found at: https://access-experiment-generator.hive-docs.org.au/
+
+
 ## Key features
 - **YAML-driven configuration**: define edits once, apply them across many experiments.  
 - **Git-branch workflow**: each variant is a branch, making experiments traceable.  
