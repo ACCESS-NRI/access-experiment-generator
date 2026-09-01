@@ -1,4 +1,5 @@
 import pytest
+from pathlib import Path
 from conftest import DummyBranch, DummyIndex
 import experiment_generator.perturbation_experiment as pert_exp
 from experiment_generator.perturbation_experiment import ExperimentDefinition as ed
@@ -373,6 +374,26 @@ def test_setup_branch_is_new_branch_false(tmp_repo_dir, indata, patch_git, check
     assert call["start_point"] == "perturb_1"
     assert call["is_new_experiment"] is new_uuid
     assert call["keep_uuid"] is True
+
+
+def test_checkout_runs_from_control_directory_and_restores_cwd_on_error(tmp_repo_dir, indata, monkeypatch, tmp_path):
+    original_directory = tmp_path / "not_control_directory"
+    original_directory.mkdir()
+    observed_directories = []
+
+    def failing_checkout(**kwargs):
+        observed_directories.append(Path.cwd())
+        raise RuntimeError("checkout failed")
+
+    monkeypatch.setattr(pert_exp, "checkout_branch", failing_checkout)
+    monkeypatch.chdir(original_directory)
+    expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
+
+    with pytest.raises(RuntimeError, match="checkout failed"):
+        expt._checkout_existing_branch("perturb_1")
+
+    assert observed_directories == [tmp_repo_dir]
+    assert Path.cwd() == original_directory
 
 
 def test_extract_run_specific_params_raises_on_invalid_list_length(tmp_repo_dir, indata):
