@@ -87,11 +87,24 @@ class PerturbationExperiment(BaseExperiment):
             elif filename.endswith("field_table"):
                 self.fieldtableupdater.update_field_table_params(params, filename, state=state)
 
+    def _run_checkout(self, **kwargs) -> None:
+        """
+        Run Payu checkout from the experiment control directory.
+        """
+        original_directory = Path.cwd()
+        try:
+            # Payu resolves some experiment configuration from the current
+            # working directory, even when config_path is absolute.
+            os.chdir(self.directory)
+            checkout_branch(**kwargs)
+        finally:
+            os.chdir(original_directory)
+
     def _checkout_existing_branch(self, branch_name: str) -> None:
         """
         Checkout an existing experiment branch using the requested UUID policy.
         """
-        checkout_branch(
+        self._run_checkout(
             branch_name=branch_name,
             is_new_branch=False,
             is_new_experiment=self.new_uuid,
@@ -431,7 +444,7 @@ class PerturbationExperiment(BaseExperiment):
             self._checkout_existing_branch(expt_def.branch_name)
         else:
             print(f"-- Creating branch {expt_def.branch_name} from {self.control_branch_name}!")
-            checkout_branch(
+            self._run_checkout(
                 branch_name=expt_def.branch_name,
                 is_new_branch=True,
                 keep_uuid=self.keep_uuid,
