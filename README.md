@@ -86,6 +86,8 @@ test_path: prototype-0.1.0 # All control and perturbation experiment repositorie
 repository_directory: 1deg_jra55_ryf # Local directory name for the central repository (user-defined)
 
 control_branch_name: ctrl
+keep_uuid: false # Keep a pre-existing UUID. If true, this overrides new_uuid.
+new_uuid: false # Generate a fresh UUID for an existing branch. Equivalent to Payu's --new-uuid.
 
 Control_Experiment:
   accessom2.nml:
