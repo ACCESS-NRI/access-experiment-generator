@@ -13,14 +13,26 @@ Your experiment plan is a YAML file. This section explains how to write it corre
 | `test_path`           | `prototype-0.1.0`                                 | Workspace directory                 |
 | `repository_directory`| `1deg_jra55_ryf`                                     | Subdir containing configs           |
 | `control_branch_name` | `ctrl`                                               | Control branch name             |
+| `keep_uuid`            | `false`                                              | Keep the UUID unchanged if one exists. For a pre-existing UUID, this overrides `new_uuid`. |
+| `new_uuid`             | `false`                                              | Generate a new UUID and archive when checking out an existing branch, equivalent to payu's `--new-uuid` flag. |
 | `Control_Experiment`  |           | Edits to apply to control branch    |
 | `Perturbation_Experiment` | see below                                        | Blocks of perturbations             |
+
+Payu requires explicit confirmation before generating a new UUID when an existing branch has no matching archive. Set
+`new_uuid: true` only when you intend to start a new experiment identity. Leave it false when the archive should still
+exist, because a missing archive may instead indicate an incorrect or changed payu `shortpath`.
+
+`keep_uuid` and `new_uuid` are independent settings rather than opposites. The experiment generator passes both values
+to payu without changing them, so payu's precedence applies: when a pre-existing UUID is present, `keep_uuid: true`
+keeps that UUID even if `new_uuid: true` is also set. For an intentional reset after deleting an archive, use
+`keep_uuid: false` with `new_uuid: true`. For later runs that should retain the newly generated identity, use
+`keep_uuid: true` with `new_uuid: false`.
 
 ## 2. Control experiment edits
 
 In many cases, you might want your `ctrl` branch to have some modifications relative to the remote branch. For example, you might need to change a few default parameters for all experiments. If so, you list those under `Control_Experiment` in the YAML. If you don't need any changes in the control, you can leave it empty or omit parameters, **but the key `Control_Experiment` should still be present, even if empty**.
 
-For example, suppose in the [`examples/Experiment_generator_example.yaml`](https://github.com/ACCESS-NRI/access-experiment-generator/blob/main/examples/Experiment_generator_example.yaml), we want to adjust the run length and job queue for all experiments. We identify the relevant files and parameters (such as - `accessom2.nml` namelist file, and Payu configuration `config.yaml` for job settings). Those appear as,
+For example, suppose in the [`examples/Experiment_generator_example.yaml`](https://github.com/ACCESS-NRI/access-experiment-generator/blob/main/examples/Experiment_generator_example.yaml), we want to adjust the run length and job queue for all experiments. We identify the relevant files and parameters (such as - `accessom2.nml` namelist file, and payu configuration `config.yaml` for job settings). Those appear as,
 
 - `accessom2.nml` – containing a `&date_manager_nml` fortran namelist group with `restart_period` setting.
 - `config.yaml` – containing job submission settings like `queue` and `walltime`.
@@ -90,6 +102,6 @@ Some rules to note:
  - Special placeholder values like `~` or `REMOVE` can be used in lists to indicate that a key should be removed for that experiment (useful for optional settings) - one YAML example can be found at [examples/Example_remove_parameters.yaml](https://github.com/ACCESS-NRI/access-experiment-generator/blob/main/examples/Example_remove_parameters.yaml).
 - The Perturbation Cookbook (next section) provides more detailed guidance on YAML format and how values are selected per experiment.
 
-After running the generator with the completed YAML, you will end up with the `ctrl` branch and two perturbation branches. Each perturbation branch (`perturb_1`, `perturb_2`) will contain the same changes that `ctrl` had (since they branch off `ctrl`), plus the specific parameter modifications for that experiment. Each branch will have a commit like `"Updated perturbation files: [...]"` listing the files changed for that case. You can then push these branches to your remote repository or use them for running experiments via `Payu`.
+After running the generator with the completed YAML, you will end up with the `ctrl` branch and two perturbation branches. Each perturbation branch (`perturb_1`, `perturb_2`) will contain the same changes that `ctrl` had (since they branch off `ctrl`), plus the specific parameter modifications for that experiment. Each branch will have a commit like `"Updated perturbation files: [...]"` listing the files changed for that case. You can then push these branches to your remote repository or use them for running experiments via `payu`.
 
 This quick start demonstrates a typical workflow: prepare YAML, run generator, then proceed with experiment runs. In practice, you might iterate on the YAML as needed to adjust parameters or add more blocks of experiments. Always use version control to your advantage – since each run configuration is a Git branch, you have a complete history of what was changed for each experiment.

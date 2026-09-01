@@ -87,6 +87,19 @@ class PerturbationExperiment(BaseExperiment):
             elif filename.endswith("field_table"):
                 self.fieldtableupdater.update_field_table_params(params, filename, state=state)
 
+    def _checkout_existing_branch(self, branch_name: str) -> None:
+        """
+        Checkout an existing experiment branch using the requested UUID policy.
+        """
+        checkout_branch(
+            branch_name=branch_name,
+            is_new_branch=False,
+            is_new_experiment=self.new_uuid,
+            keep_uuid=self.keep_uuid,
+            start_point=branch_name,
+            config_path=self.directory / "config.yaml",
+        )
+
     def manage_control_expt(self) -> None:
         """
         Update files for the control branch (name held in `self.control_branch_name`).
@@ -102,12 +115,7 @@ class PerturbationExperiment(BaseExperiment):
         # Ensure we are on the control branch
         branch_names = {i.name for i in self.gitrepository.repo.branches}
         if self.control_branch_name in branch_names:
-            checkout_branch(
-                branch_name=self.control_branch_name,
-                is_new_branch=False,
-                start_point=self.control_branch_name,
-                config_path=self.directory / "config.yaml",
-            )
+            self._checkout_existing_branch(self.control_branch_name)
 
         state = self.state_store.load_state(self.control_branch_name)
 
@@ -420,12 +428,7 @@ class PerturbationExperiment(BaseExperiment):
 
         if branch_existed:
             print(f"-- Branch {expt_def.branch_name} already exists, switching to it only!")
-            checkout_branch(
-                branch_name=expt_def.branch_name,
-                is_new_branch=False,
-                start_point=expt_def.branch_name,
-                config_path=self.directory / "config.yaml",
-            )
+            self._checkout_existing_branch(expt_def.branch_name)
         else:
             print(f"-- Creating branch {expt_def.branch_name} from {self.control_branch_name}!")
             checkout_branch(
