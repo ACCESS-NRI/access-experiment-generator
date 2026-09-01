@@ -23,6 +23,7 @@ class BaseExperiment:
         self.existing_branch = indata.get("existing_branch", None)
         self.control_branch_name = indata.get("control_branch_name", "ctrl")
         self.keep_uuid = indata.get("keep_uuid", False)
+        self.new_uuid = indata.get("new_uuid", False)
 
         # Restart and configuration paths
         self.restart_path = indata.get("restart_path", None)

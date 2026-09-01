@@ -24,6 +24,7 @@ def test_base_experiment_defaults_and_paths(tmp_path, monkeypatch):
     assert base.existing_branch is None
     assert base.control_branch_name == "ctrl"
     assert base.keep_uuid is False
+    assert base.new_uuid is False
 
     # Restart and configuration paths
     assert base.restart_path is None
@@ -47,6 +48,7 @@ def test_base_experiment_custom_values_and_paths(tmp_path):
         "existing_branch": "main",
         "control_branch_name": "test_branch",
         "keep_uuid": True,
+        "new_uuid": True,
         "restart_path": tmp_path / "restart_path",
         "parent_experiment": tmp_path / "parent_path",
         "config_path": tmp_path / "config_path",
@@ -67,6 +69,7 @@ def test_base_experiment_custom_values_and_paths(tmp_path):
     assert base.existing_branch == "main"
     assert base.control_branch_name == "test_branch"
     assert base.keep_uuid is True
+    assert base.new_uuid is True
     assert base.restart_path == tmp_path / "restart_path"
     assert base.parent_experiment == tmp_path / "parent_path"
     assert base.config_path == tmp_path / "config_path"

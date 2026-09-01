@@ -166,7 +166,7 @@ def test_apply_updates_with_correct_updaters(tmp_repo_dir, patch_updaters, indat
     )
 
 
-def test_manage_control_expt_applies_updates_and_commits(tmp_repo_dir, indata, patch_git):
+def test_manage_control_expt_applies_updates_and_commits(tmp_repo_dir, indata, patch_git, checkout_recorder):
     patch_git.repo.branches = [DummyBranch(indata["control_branch_name"])]
     patch_git.repo.index = DummyIndex(
         ["config.yaml", "ice_in", "MOM_input", "nuopc.runseq", "nuopc.runconfig", "atmosphere/forcing.json"]
@@ -181,10 +181,20 @@ def test_manage_control_expt_applies_updates_and_commits(tmp_repo_dir, indata, p
         "atmosphere/forcing.json": {"tas": {"perturbations": [{"type": "REMOVE"}]}},
     }
 
-    indata = {**indata, "Control_Experiment": control_block}
+    indata = {**indata, "Control_Experiment": control_block, "keep_uuid": False, "new_uuid": True}
     expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
 
     expt.manage_control_expt()
+    assert checkout_recorder == [
+        {
+            "branch_name": indata["control_branch_name"],
+            "is_new_branch": False,
+            "is_new_experiment": True,
+            "keep_uuid": False,
+            "start_point": indata["control_branch_name"],
+            "config_path": tmp_repo_dir / "config.yaml",
+        }
+    ]
 
     assert len(patch_git.commits) == 1
     msg, files = patch_git.commits[0]
@@ -344,9 +354,10 @@ def test_extract_run_specific_params_rules(tmp_repo_dir, indata, param_dict, ind
     assert result == expected
 
 
-def test_setup_branch_is_new_branch_false(tmp_repo_dir, indata, patch_git, checkout_recorder):
+@pytest.mark.parametrize("new_uuid", [False, True])
+def test_setup_branch_is_new_branch_false(tmp_repo_dir, indata, patch_git, checkout_recorder, new_uuid):
     patch_git.repo.branches = [DummyBranch("perturb_1")]
-    expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
+    expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata={**indata, "new_uuid": new_uuid})
     expt_def = ed(
         block_name="Parameter_block1",
         branch_name="perturb_1",
@@ -360,6 +371,8 @@ def test_setup_branch_is_new_branch_false(tmp_repo_dir, indata, patch_git, check
     assert call["branch_name"] == "perturb_1"
     assert call["is_new_branch"] is False
     assert call["start_point"] == "perturb_1"
+    assert call["is_new_experiment"] is new_uuid
+    assert call["keep_uuid"] is True
 
 
 def test_extract_run_specific_params_raises_on_invalid_list_length(tmp_repo_dir, indata):
