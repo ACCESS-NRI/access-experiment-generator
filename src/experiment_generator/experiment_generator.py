@@ -2,6 +2,7 @@ from payu.branch import clone
 from payu.models import index as model_index
 from .perturbation_experiment import PerturbationExperiment
 from .base_experiment import BaseExperiment
+from .base_archive import apply_base_archive
 
 # directly use Payu api
 # https://github.com/payu-org/payu/blob/master/payu/subcommands/list_cmd.py
@@ -26,6 +27,8 @@ class ExperimentGenerator(BaseExperiment):
         Args:
             indata (dict): Dictionary containing input settings from the YAML input.
         """
+        # a base run fills in the control experiment source before anything reads it
+        apply_base_archive(indata)
         super().__init__(indata)
 
     def run(self) -> None:
@@ -63,7 +66,9 @@ class ExperimentGenerator(BaseExperiment):
         """
         if self.directory.exists():
             print(f"-- Test dir: {self.directory} already exists, hence not cloning {self.repository_url}")
-        else:
+            return
+
+        try:
             clone(
                 repository=self.repository_url,
                 directory=self.directory,
@@ -77,3 +82,13 @@ class ExperimentGenerator(BaseExperiment):
                 parent_experiment=self.parent_experiment,
                 start_point=self.start_point,
             )
+        except Exception as error:
+            # Git refuses to read a repository owned by someone else
+            # https://github.com/ACCESS-NRI/access-experiment-generator/issues/103
+            if "dubious ownership" not in str(error):
+                raise
+            raise RuntimeError(
+                f"Git refuses to read {self.repository_url} because it belongs to another user. "
+                f"To add an exception for this directory, call:\n"
+                f"    git config --global --add safe.directory {self.repository_url}/.git"
+            ) from error
