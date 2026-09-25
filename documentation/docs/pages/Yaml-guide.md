@@ -5,18 +5,21 @@ Your experiment plan is a YAML file. This section explains how to write it corre
 
 ## 1. Top-level keys
 
-| Key                   | Example                                              | Description                         |
-|-----------------------|------------------------------------------------------|-------------------------------------|
-| `model_type`          | `access-om2`                                         | Model/config type, can be either `access-om2`, `access-om3`, `access-esm1.5` or `access-esm1.6`.                   |
-| `repository_url`      | `git@github.com:ACCESS-NRI/access-om2-configs.git`   | Git repo to clone for the control experiment.                   |
-| `start_point`         | `fce24e3`                                            | Commit/branch to start from         |
-| `test_path`           | `prototype-0.1.0`                                 | Workspace directory                 |
-| `repository_directory`| `1deg_jra55_ryf`                                     | Subdir containing configs           |
-| `control_branch_name` | `ctrl`                                               | Control branch name             |
-| `keep_uuid`            | `false`                                              | Keep the UUID unchanged if one exists. For a pre-existing UUID, this overrides `new_uuid`. |
-| `new_uuid`             | `false`                                              | Generate a new UUID and archive when checking out an existing branch, equivalent to payu's `--new-uuid` flag. |
-| `Control_Experiment`  |           | Edits to apply to control branch    |
-| `Perturbation_Experiment` | see below                                        | Blocks of perturbations             |
+| Key                       | Example                                            | Description                                                                                                                                  |
+|---------------------------|----------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| `model_type`              | `access-om2`                                       | Model/config type, can be either `access-om2`, `access-om3`, `access-esm1.5` or `access-esm1.6`.                                             |
+| `repository_url`          | `git@github.com:ACCESS-NRI/access-om2-configs.git` | Git repo to clone for the control experiment.                                                                                                |
+| `source_experiment_path`  | `/g/data/<project>/<expt>`                         | Experiment to base this one on, given as its control or archive directory. Fills in `repository_url` and `start_point`.                      |
+| `source_run`              | `9`                                                | Which run of `source_experiment_path` to start from. Required, because the most recent run moves.                                            |
+| `source_restart`          | `true`                                             | Continue from the restart `source_run` ended at. Sets `restart_path`. If left out or `false`, the control experiment starts from cold.       |
+| `start_point`             | `fce24e3`                                          | Commit/branch the control branch starts from                                                                                                 |
+| `test_path`               | `prototype-0.1.0`                                  | Workspace directory                                                                                                                          |
+| `repository_directory`    | `1deg_jra55_ryf`                                   | Subdir containing configs                                                                                                                    |
+| `control_branch_name`     | `ctrl`                                             | Control branch name                                                                                                                          |
+| `keep_uuid`               | `false`                                            | Keep the UUID unchanged if one exists. For a pre-existing UUID, this overrides `new_uuid`.                                                   |
+| `new_uuid`                | `false`                                            | Generate a new UUID and archive when checking out an existing branch, equivalent to payu's `--new-uuid` flag.                                |
+| `Control_Experiment`      |                                                    | Edits to apply to control branch                                                                                                             |
+| `Perturbation_Experiment` | see below                                          | Blocks of perturbations                                                                                                                      |
 
 Payu requires explicit confirmation before generating a new UUID when an existing branch has no matching archive. Set
 `new_uuid: true` only when you intend to start a new experiment identity. Leave it false when the archive should still
@@ -27,6 +30,57 @@ to payu without changing them, so payu's precedence applies: when a pre-existing
 keeps that UUID even if `new_uuid: true` is also set. For an intentional reset after deleting an archive, use
 `keep_uuid: false` with `new_uuid: true`. For later runs that should retain the newly generated identity, use
 `keep_uuid: true` with `new_uuid: false`.
+
+### Basing an experiment on a run that already exists
+
+Perturbation sets are often built around a run that has already happened: one of your own, or a different user's that you have only the archive path for. `source_experiment_path` reads what it needs out of that run's own metadata, so you do not have to find the commit yourself:
+
+```yaml
+model_type: access-om3
+source_experiment_path: /g/data/<project>/<expt>/archive
+source_run: 9  # which run to start from
+source_restart: true  # optional, to continue from where that run ended
+test_path: prototype-0.1.0
+repository_directory: my_perturbations
+control_branch_name: ctrl
+```
+
+That fills in and prints:
+
+| from the run metadata | key it fills |
+|---|---|
+| `payu_control_path` | `repository_url` |
+| `payu_run_id` | `start_point` |
+| `<archive>/restart<source_run>` | `restart_path`, only when `source_restart` is `true` |
+
+!!! tip "Leave `source_restart` out"
+    Leave `source_restart` out and the control experiment starts from cold. Keys you set yourself are never overwritten, and each one kept is printed.
+
+??? info "Other ways to name the run"
+
+    `source_experiment_path` takes either the experiment's control directory or its archive directory; the control directory's `archive` link is followed for you.
+
+    You can skip it entirely: `repository_url` takes a local path, so `repository_url` plus `start_point: <commit>` does the same job by hand.
+
+??? info "Why `source_run` and `source_restart` are not inferred"
+
+    The latest run of an experiment that is still running moves, so `source_run` is required rather than defaulting to it. `source_restart` is a switch rather than a restart number because `restartNNN` holds the state that run NNN's configuration produced, and configurations drift between runs — pairing one run's configuration with another run's state is incoherent in a way nothing downstream would flag.
+
+    Restarts are pruned by `restart_freq`, so the one you want may no longer be there; the error then names the runs that can still be continued from. To start from some other run's state, leave `source_restart` out and set `restart_path` yourself — nothing then checks that the state and the configuration belong together. Setting both is rejected, since they ask for different restarts.
+
+??? warning "`archive/outputNNN` is not a base"
+
+    It is a record of a run, holding payu's runtime-modified configuration such as `start_type = continue`. The commit `payu_run_id` names holds the configuration as written, which is what a new control should start from.
+
+??? warning "Basing on a different user's run: Git ownership"
+
+    Git refuses to read a repository owned by another user until it is trusted, once:
+
+    ```bash
+    git config --global --add safe.directory /g/data/<project>/<their-expt>/.git
+    ```
+
+    It honours that only from your global or system configuration, so the generator cannot set it for you; it reports the exact command when a clone fails this way.
 
 ## 2. Control experiment edits
 
