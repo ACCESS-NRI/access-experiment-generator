@@ -17,23 +17,20 @@ def _read_job(job_file: Path) -> dict:
     return json.loads(job_file.read_text(encoding="utf-8"))
 
 
-def _job_metadata(path: Path, base_run: int | None) -> tuple[Path, dict]:
+def _job_metadata(path: Path, source_run: int | None) -> tuple[Path, dict]:
     """
-    Read the payu job metadata for run `base_run`.
+    Read the payu job metadata for run `source_run`.
 
-    `path` may be an archive directory, a control directory,
-    or a job metadata file (`payu_jobs/<run>/run/<jobid>.json`).
+    `path` may be an experiment's archive directory, or its control directory, whose
+    `archive` points at one.
     """
-    if path.is_file():
-        return path, _read_job(path)
-
     for p in (path, path / "archive"):
         jobs = p / PAYU_JOBS_DIR
         if jobs.is_dir():
             break
     else:
         raise ValueError(
-            f"`base_archive_path` {path} holds no {PAYU_JOBS_DIR}/ directory "
+            f"`source_experiment_path` {path} holds no {PAYU_JOBS_DIR}/ directory "
             f"(looked in {path} and {path / 'archive'})! "
         )
 
@@ -47,24 +44,24 @@ def _job_metadata(path: Path, base_run: int | None) -> tuple[Path, dict]:
         raise ValueError(f"No payu run metadata found under {jobs}!")
 
     # the most recent run of an experiment that is still running moves, so it is never chosen here
-    if base_run is None:
-        raise ValueError(f"`base_run` must name the run to start from; {jobs} holds runs {sorted(runs_path)}!")
-    if base_run not in runs_path:
-        raise ValueError(f"`base_run` {base_run} is not under {jobs}, available runs are {sorted(runs_path)}!")
+    if source_run is None:
+        raise ValueError(f"`source_run` must name the run to start from; {jobs} holds runs {sorted(runs_path)}!")
+    if source_run not in runs_path:
+        raise ValueError(f"`source_run` {source_run} is not under {jobs}, available runs are {sorted(runs_path)}!")
 
     # payu writes one file per submission attempt, so a run that crashed and was
     # resubmitted has several. Only the attempt with `payu_run_status` 0 finished
     # and produced this run's output; the rest failed, some before recording a commit.
-    for job_file in runs_path[base_run]:
+    for job_file in runs_path[source_run]:
         job = _read_job(job_file)
         if job.get("payu_run_status") == 0:
             return job_file, job
-    raise ValueError(f"`base_run` {base_run} has no attempt recorded as successful under {jobs}!")
+    raise ValueError(f"`source_run` {source_run} has no attempt recorded as successful under {jobs}!")
 
 
-def _restart_path(archive_path: Path, base_run: int) -> Path:
+def _restart_path(archive_path: Path, source_run: int) -> Path:
     """
-    Resolve the restart that run `base_run` ended at.
+    Resolve the restart that run `source_run` ended at.
 
     A restart is never chosen freely, that is, the state at `restartXXX` was produced by the
     configuration of outputXXX, while configurations may drift between runs, so pairing one
@@ -73,11 +70,11 @@ def _restart_path(archive_path: Path, base_run: int) -> Path:
     if not archive_path.is_dir():
         raise ValueError(f"Archive {archive_path} recorded in the run metadata does not exist!")
 
-    path = archive_path / f"restart{base_run:03d}"
+    path = archive_path / f"restart{source_run:03d}"
     if not path.is_dir():
         kept = sorted(int(d.name.removeprefix("restart")) for d in archive_path.glob("restart[0-9]*"))
         raise ValueError(
-            f"Restart {path} is not in the archive, so run {base_run} cannot be continued from; "
+            f"Restart {path} is not in the archive, so run {source_run} cannot be continued from; "
             f"runs whose restarts are still kept are {kept}! Set `restart_path` yourself to start "
             f"from another run's state, which is not checked against this run's configuration."
         )
@@ -86,7 +83,7 @@ def _restart_path(archive_path: Path, base_run: int) -> Path:
 
 def _repository(job_file: Path, payu_control_path: str) -> str:
     """
-    Where to clone the base run's configuration.
+    Where to clone the source run's configuration.
 
     The control directory is authoritative, but it can have been deleted, moved, or left
     in a home directory nobody else can read. `payu sync` leaves a bare clone of it beside
@@ -107,27 +104,27 @@ def _repository(job_file: Path, payu_control_path: str) -> str:
     )
 
 
-def apply_base_archive(indata: dict) -> None:
+def apply_source_experiment(indata: dict) -> None:
     """
     Fill the control experiment source in `indata` from an archived payu run in place.
 
-    base_archive_path (str): An archive, a control directory, or one
+    source_experiment_path (str): An archive, a control directory, or one
         `payu_jobs/<run>/run/<jobid>.json` file, which names its own run.
-    base_run (int): Which run of it to start from. Required, because the most recent moves.
-    base_restart (bool): Continue from where that run ended, rather than starting from cold.
+    source_run (int): Which run of it to start from. Required, because the most recent moves.
+    source_restart (bool): Continue from where that run ended, rather than starting from cold.
     """
-    base = indata.get("base_archive_path")
+    base = indata.get("source_experiment_path")
     if not base:
         return
 
-    if indata.get("base_restart") and indata.get("restart_path"):
+    if indata.get("source_restart") and indata.get("restart_path"):
         raise ValueError(
-            f"`base_restart` and `restart_path` ({indata['restart_path']}) are both set, but "
-            "`base_restart` resolves the restart of `base_run` while `restart_path` names one "
+            f"`source_restart` and `restart_path` ({indata['restart_path']}) are both set, but "
+            "`source_restart` resolves the restart of `source_run` while `restart_path` names one "
             "yourself. Set only one of them!"
         )
 
-    job_file, job = _job_metadata(Path(base).expanduser().resolve(), indata.get("base_run"))
+    job_file, job = _job_metadata(Path(base).expanduser().resolve(), indata.get("source_run"))
 
     payu_control_path = job.get("payu_control_path")
     payu_run_id = job.get("payu_run_id")
@@ -135,7 +132,7 @@ def apply_base_archive(indata: dict) -> None:
         raise ValueError(
             f"{job_file} records no `payu_control_path` and `payu_run_id`: it is either an attempt "
             "that failed before recording them, or was written by a payu older than 1.3. Point at "
-            "the archive and name the run with `base_run` to use the attempt that succeeded."
+            "the archive and name the run with `source_run` to use the attempt that succeeded."
         )
 
     resolved = {
@@ -143,10 +140,10 @@ def apply_base_archive(indata: dict) -> None:
         "start_point": payu_run_id,
         "parent_experiment": (job.get("experiment_metadata") or {}).get("experiment_uuid"),
     }
-    if indata.get("base_restart"):
+    if indata.get("source_restart"):
         resolved["restart_path"] = str(_restart_path(Path(job["payu_archive_path"]), job["payu_current_run"]))
 
-    print(f"-- Base run metadata: {job_file}")
+    print(f"-- Source run metadata: {job_file}")
     for k, v in resolved.items():
         if v is None:
             continue
@@ -154,9 +151,9 @@ def apply_base_archive(indata: dict) -> None:
             indata[k] = v
             print(f" -- {k}: {v}")
         elif indata[k] != v:
-            print(f" -- {k}: keeping {indata[k]} from the YAML input, base run records {v}")
+            print(f" -- {k}: keeping {indata[k]} from the YAML input, source run records {v}")
 
     if not indata.get("restart_path"):
         run = job["payu_current_run"]
         print(" -- `restart_path` is not specified, so the control experiment starts from cold")
-        print(f" -- set `base_restart: true` to continue from the end of run {run} instead")
+        print(f" -- set `source_restart: true` to continue from the end of run {run} instead")

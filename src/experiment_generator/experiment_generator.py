@@ -2,7 +2,7 @@ from payu.branch import clone
 from payu.models import index as model_index
 from .perturbation_experiment import PerturbationExperiment
 from .base_experiment import BaseExperiment
-from .base_archive import apply_base_archive
+from .source_experiment import apply_source_experiment
 
 # directly use Payu api
 # https://github.com/payu-org/payu/blob/master/payu/subcommands/list_cmd.py
@@ -27,8 +27,8 @@ class ExperimentGenerator(BaseExperiment):
         Args:
             indata (dict): Dictionary containing input settings from the YAML input.
         """
-        # a base run fills in the control experiment source before anything reads it
-        apply_base_archive(indata)
+        # a source run fills in the control experiment source before anything reads it
+        apply_source_experiment(indata)
         super().__init__(indata)
 
     def run(self) -> None:
