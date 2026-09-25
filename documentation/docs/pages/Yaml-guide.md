@@ -54,15 +54,15 @@ That fills in and prints:
 | `<archive>/restart<source_run>` | `restart_path`, only when `source_restart` is `true` |
 
 !!! tip "Leave `source_restart` out"
-    Leave `source_restart` out and the control experiment starts from cold. Keys you set yourself are never overwritten, and each one kept is printed.
+    Leave `source_restart` out and the control experiment starts from cold.
 
-??? info "Other ways to name the run"
+??? tip "Other ways to name the run"
 
     `source_experiment_path` takes either the experiment's control directory or its archive directory; the control directory's `archive` link is followed for you.
 
     You can skip it entirely: `repository_url` takes a local path, so `repository_url` plus `start_point: <commit>` does the same job by hand.
 
-??? info "Why `source_run` and `source_restart` are not inferred"
+??? warning "`source_run` and `source_restart` are not inferred"
 
     The latest run of an experiment that is still running moves, so `source_run` is required rather than defaulting to it. `source_restart` is a switch rather than a restart number because `restartNNN` holds the state that run NNN's configuration produced, and configurations drift between runs — pairing one run's configuration with another run's state is incoherent in a way nothing downstream would flag.
 
