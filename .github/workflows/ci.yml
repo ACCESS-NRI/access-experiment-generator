@@ -10,6 +10,8 @@ on:
     paths-ignore:
       # These are ignored because they don't have anything to do with the model itself
       - documentation/**
+  schedule:
+    - cron: "0 19 * * 0"  # Run every Monday at 5am under AEST / 6am under AEDT
   workflow_dispatch:
 
 env:
