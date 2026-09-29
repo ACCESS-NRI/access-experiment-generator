@@ -153,3 +153,32 @@ def test_run_with_perturbation(tmp_path, base_indata, clone_recorder, pert_exp_r
 
     assert "manage_control_expt" in pert_exp.calls
     assert "manage_perturb_expt" in pert_exp.calls
+
+
+def test_clone_repository_uses_a_resolved_source_run(tmp_path, base_indata, clone_recorder):
+    """
+    A source run fills in the control experiment source before the clone happens.
+    """
+    from test_source_experiment import write_job
+
+    (tmp_path / "control").mkdir()
+    archive = tmp_path / "archive"
+    write_job(archive, 4)
+
+    indata = dict(base_indata, repository_url=None, start_point=None, source_experiment_path=str(archive), source_run=4)
+    obj_eg = eg(indata)
+    obj_eg._clone_repository()
+
+    call = clone_recorder[0]
+    assert call["repository"] == str(tmp_path / "control")
+    assert call["start_point"] == f"{4:040d}"
+    assert call["parent_experiment"] == "uuid-4"
+
+
+def test_clone_repository_does_not_mask_other_errors(tmp_path, base_indata, monkeypatch):
+    def failing_clone(**kwargs):
+        raise RuntimeError("some other git failure")
+
+    monkeypatch.setattr(exp_gen, "clone", failing_clone, raising=True)
+    with pytest.raises(RuntimeError, match="some other git failure"):
+        eg(base_indata)._clone_repository()
