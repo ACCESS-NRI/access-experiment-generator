@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from experiment_generator.source_experiment import apply_source_experiment
+from experiment_generator.source_experiment import _restart_path, apply_source_experiment
 
 
 def write_job(archive, run, job_id="100.gadi-pbs.json", **overrides):
@@ -85,6 +85,36 @@ def test_resolves_directly_from_a_job_file(tmp_path, source_run):
     assert indata["repository_url"] == str(tmp_path / "control")
     assert indata["start_point"] == f"{2:040d}"
     assert indata["parent_experiment"] == "uuid-2"
+
+
+def test_job_file_must_contain_a_json_object(source_run):
+    job_file = write_job(source_run, 2)
+    job_file.write_text("[]", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="must contain a JSON object"):
+        apply_source_experiment({"source_experiment_path": str(job_file)})
+
+
+def test_job_file_must_be_in_a_payu_archive(tmp_path):
+    job_file = tmp_path / "job.json"
+    job_file.write_text("{}", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="must be under.*payu_jobs"):
+        apply_source_experiment({"source_experiment_path": str(job_file)})
+
+
+def test_job_file_run_must_be_an_integer(source_run):
+    job_file = write_job(source_run, 2, payu_current_run="2")
+
+    with pytest.raises(ValueError, match=r"invalid `payu_current_run` '2'"):
+        apply_source_experiment({"source_experiment_path": str(job_file)})
+
+
+def test_job_file_run_must_match_its_directory(source_run):
+    job_file = write_job(source_run, 2, payu_current_run=3)
+
+    with pytest.raises(ValueError, match=r"records `payu_current_run` 3.*stored under run 2"):
+        apply_source_experiment({"source_experiment_path": str(job_file)})
 
 
 def test_job_file_rejects_a_different_source_run(source_run):
@@ -198,6 +228,11 @@ def test_source_restart_uses_the_restart_of_the_chosen_run(tmp_path, source_run)
     indata = {"source_experiment_path": str(source_run), "source_run": 2, "source_restart": True}
     apply_source_experiment(indata)
     assert indata["restart_path"] == str(source_run / "restart002")
+
+
+def test_restart_requires_an_existing_archive(tmp_path):
+    with pytest.raises(ValueError, match="Archive.*does not exist"):
+        _restart_path(tmp_path / "missing-archive", 2)
 
 
 def test_without_source_restart_the_control_starts_cold(tmp_path, source_run, capsys):
