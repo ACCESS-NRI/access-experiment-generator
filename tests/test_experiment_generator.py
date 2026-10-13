@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from pathlib import Path
 
@@ -159,11 +161,22 @@ def test_clone_repository_uses_a_resolved_source_run(tmp_path, base_indata, clon
     """
     A source run fills in the control experiment source before the clone happens.
     """
-    from test_source_experiment import write_job
-
     (tmp_path / "control").mkdir()
     archive = tmp_path / "archive"
-    write_job(archive, 4)
+    job_dir = archive / "payu_jobs" / "4" / "run"
+    job_dir.mkdir(parents=True)
+    (job_dir / "100.gadi-pbs.json").write_text(
+        json.dumps(
+            {
+                "payu_current_run": 4,
+                "payu_control_path": str(tmp_path / "control"),
+                "payu_run_id": f"{4:040d}",
+                "payu_run_status": 0,
+                "experiment_metadata": {"experiment_uuid": "uuid-4"},
+            }
+        ),
+        encoding="utf-8",
+    )
 
     indata = dict(base_indata, repository_url=None, start_point=None, source_experiment_path=str(archive), source_run=4)
     obj_eg = eg(indata)
