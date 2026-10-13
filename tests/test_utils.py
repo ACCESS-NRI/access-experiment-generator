@@ -1,4 +1,5 @@
 import pytest
+from access.config import MOM6InputParser, NUOPCParser, YAMLParser
 from experiment_generator.utils import (
     update_config_entries,
     _merge_lists_positional,
@@ -469,3 +470,78 @@ def test_update_config_entries_unwraps_single_item_list_to_scalar_when_base_is_s
 #     changes = {"lst": [{}, {}, {}]}
 #     update_config_entries(base, changes, pop_key=True)
 #     assert base == {"lst": ["only"]}
+
+
+# --- configurations parsed by access-config-utils ---
+
+
+def test_update_config_entries_config_int_over_float():
+    """
+    A YAML int written over a float stays a float, as a parsed Config keeps each value's type.
+    """
+    config = MOM6InputParser().parse("DT = 900.0\nLAYOUT = 4.0, 4.0\nNK = 75\n")
+    update_config_entries(config, {"DT": 1800, "LAYOUT": [8, 8], "NK": 50})
+    assert str(config) == "DT = 1800.0\nLAYOUT = 8.0, 8.0\nNK = 50\n"
+
+
+def test_update_config_entries_config_type_change_moves_entry():
+    """
+    A value of another type cannot be written in place, so the entry is written anew at the end.
+    """
+    config = MOM6InputParser().parse('NK = 75\nINPUTDIR = "INPUT"\n')
+    update_config_entries(config, {"NK": "75"})
+    assert str(config) == 'INPUTDIR = "INPUT"\nNK = "75"\n'
+
+
+def test_update_config_entries_config_list():
+    config = NUOPCParser().parse("ATTRS::\n  levels = 1:10:19\n  model = mom\n::\n")
+    state = {}
+
+    # unchanged: the file is left alone
+    update_config_entries(config, {"ATTRS": {"levels": [1, "PRESERVE", 19]}}, state=state)
+    assert str(config) == "ATTRS::\n  levels = 1:10:19\n  model = mom\n::\n"
+
+    # same length: written in place
+    update_config_entries(config, {"ATTRS": {"levels": [1, 5, 19]}}, state=state)
+    assert str(config) == "ATTRS::\n  levels = 1:5:19\n  model = mom\n::\n"
+
+    # another length: laid out again where it is
+    update_config_entries(config, {"ATTRS": {"levels": [1, 2, 3, 4]}}, state={})
+    assert str(config) == "ATTRS::\n  levels = 1:2:3:4\n  model = mom\n::\n"
+
+    # every element removed: the entry is removed
+    update_config_entries(config, {"ATTRS": {"levels": [REMOVED] * 4}}, state={})
+    assert str(config) == "ATTRS::\n  model = mom\n::\n"
+
+
+def test_update_config_entries_config_unwritable_value():
+    config = MOM6InputParser().parse("DT = 900.0\n")
+    with pytest.raises(ValueError, match=r"MOM_input.DT: cannot write None"):
+        update_config_entries(config, {"DT": None}, path="MOM_input")
+
+
+def test_update_config_entries_config_with_yaml_input_types():
+    """
+    The YAML input is loaded round-trip, so its values are ruamel.yaml subclasses of the builtin types.
+    """
+    changes = YAMLParser().parse("""
+DT: 1200.0
+INPUTDIR: "INPUT2"
+USE_KPP: &flag true
+BULKMIXEDLAYER: *flag
+NK: &nk 50
+LAYOUT: [8, 8]
+KPP:
+  N_SMOOTH: 2
+NEW_BLOCK:
+  A: 0.5
+""")
+    config = MOM6InputParser().parse(
+        'DT = 900.0\nINPUTDIR = "INPUT"\nUSE_KPP = False\nBULKMIXEDLAYER = True\nNK = 75\nLAYOUT = 4, 4\n'
+        "KPP%\nN_SMOOTH = 1\n%KPP\n"
+    )
+    update_config_entries(config, changes)
+    assert str(config) == (
+        'DT = 1200.0\nINPUTDIR = "INPUT2"\nUSE_KPP = True\nBULKMIXEDLAYER = True\nNK = 50\nLAYOUT = 8, 8\n'
+        "KPP%\nN_SMOOTH = 2\n%KPP\nNEW_BLOCK%\nA = 0.5\n%NEW_BLOCK\n"
+    )
