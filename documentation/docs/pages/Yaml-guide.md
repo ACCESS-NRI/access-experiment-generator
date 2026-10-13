@@ -52,6 +52,9 @@ Some notes:
  - File paths are relative to the `repository_directory` (e.g., `ice/cice_in.nml` is a file under `1deg_jra55_ryf/ice` directory in the cloned repo, where `1deg_jra55_ryf` is the `repository_directory`).
  - The YAML hierarchy must mirror the structure of the file, such as in `accessom2.nml`, `restart_period` is inside the namelist group `&date_manager_nml`, so we nest it under `date_manager_nml` in YAML.
  - The values are given as strings where necessary (for example, the `restart_period` has commas, so we put it in quotes).
+ - Blocks inside a file are nested in the same way. For example, the parameters in a `KPP%` ... `%KPP` block of `MOM_input` go under `KPP`, e.g. `KPP: {N_SMOOTH: 2}`.
+ - Values are written in the notation of the file, and keep the type of the value they replace: `DT: 1800` replaces `DT = 900.0` in `MOM_input` with `DT = 1800.0`, a string is quoted where the file format requires it, and `true` becomes `.true.` in a namelist.
+ - A value of `~` (no value) becomes a null value in YAML files, in Fortran namelists (`key =`) and in `nuopc.runconfig` (`key =` in a table, `label:` at the top level), which leaves the variable or attribute at its default. `MOM_input` has no way to write it, as MOM6 stops on a parameter with no value, so use `REMOVE` there instead.
 
 If `Control_Experiment` is provided, the generator will create the new `ctrl` branch and apply these changes there. It will then commit the changes on that branch. After running the tool, if we check our Git branches, we would see `ctrl` alongside the original branch:
 

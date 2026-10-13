@@ -12,6 +12,8 @@ This module provides helper functions
 from collections.abc import Mapping, Sequence
 from .common_var import _is_removed_str, _is_preserved_str, _is_seq
 from copy import deepcopy
+from access.config import Config, ConfigList
+from ruamel.yaml.scalarbool import ScalarBoolean
 
 
 def _path_join(path: str, key: str) -> str:
@@ -113,6 +115,77 @@ def _clean_removes(x, *, pop_key: bool) -> object:
 
 class PositionalMergeError(ValueError):
     pass
+
+
+def _plain(value):
+    """
+    Return `value` as the builtin Python types.
+
+    The YAML input is loaded round-trip, so its values can be ruamel.yaml's subclasses of the builtin types
+    (e.g. `ScalarFloat` for any float, `ScalarBoolean`, an int, for an anchored bool), and a parsed `Config`
+    only accepts the builtin types themselves.
+    """
+    if isinstance(value, (bool, ScalarBoolean)):
+        return bool(value)
+    if isinstance(value, int):
+        return int(value)
+    if isinstance(value, float):
+        return float(value)
+    if isinstance(value, str):
+        return str(value)
+    if isinstance(value, Mapping):
+        return {k: _plain(v) for k, v in value.items()}
+    if _is_seq(value):
+        return [_plain(v) for v in value]
+    return value
+
+
+def _is_int(x) -> bool:
+    return isinstance(x, int) and not isinstance(x, bool)
+
+
+def _match_number_type(value, current):
+    """
+    Write an int as a float where the file holds a float.
+
+    YAML has no notation forcing a whole number to be a float, so `DT: 1800` arrives as an int
+    even when the file says `DT = 1800.0`, and a parsed `Config` refuses to change a value's type.
+    """
+    if isinstance(value, list) and isinstance(current, list):
+        if current and all(isinstance(c, float) for c in current):
+            return [float(v) if _is_int(v) else v for v in value]
+        return value
+    if isinstance(current, float) and _is_int(value):
+        return float(value)
+    return value
+
+
+def _assign(base: dict, key, value, path: str) -> None:
+    """
+    Set `base[key] = value`, whichever parser `base` came from.
+
+    A `Config` from access-config-utils ties each entry to the text it was read from, so it keeps
+    the entry's type. A change of type cannot be written in place: the entry is removed and added
+    again instead, which moves it to the end of its block. (A list of another length is laid out
+    again where it is.)
+    """
+    if not isinstance(base, Config):
+        base[key] = value
+        return
+
+    value = _plain(value)
+    try:
+        if key in base:
+            value = _match_number_type(value, base[key])
+            try:
+                base[key] = value
+                return
+            except (TypeError, ValueError, SyntaxError):
+                # the type changed, or a value became a block
+                del base[key]
+        base[key] = value
+    except (TypeError, ValueError) as err:
+        raise ValueError(f"\n -- {path}: cannot write {value!r} to this file: {err}") from err
 
 
 def _merge_lists_positional(
@@ -276,18 +349,25 @@ def update_config_entries(
             continue
 
         if isinstance(base.get(k), list) and isinstance(v, list):
-            merged = _merge_lists_positional(base[k], v, path=key_path, state=state, pop_key=pop_key)
+            base_list = base[k]
+            # a ConfigList cannot be copied (its elements are tied to the file text), so merge a plain copy
+            plain_list = list(base_list) if isinstance(base_list, ConfigList) else base_list
+            merged = _merge_lists_positional(plain_list, v, path=key_path, state=state, pop_key=pop_key)
             # if merge returned None -> delete key
             if merged is None or (pop_key and isinstance(merged, list) and len(merged) == 0):
                 base.pop(k, None)
                 continue
 
-            # inplace update to preserve formatting and comments
-            base_list = base[k]
-
             # if nothing changes then do nothing to preserve formatting
             if base_list == merged:
                 continue
+
+            # a ConfigList can only be written as a whole
+            if isinstance(base_list, ConfigList):
+                _assign(base, k, merged, key_path)
+                continue
+
+            # inplace update to preserve formatting and comments
 
             # overwrite existing slots
             n = min(len(base_list), len(merged))
@@ -317,6 +397,6 @@ def update_config_entries(
                     # special case: cleaned to empty sequence and pop_key=True -> remove key
                     base.pop(k, None)
                     continue
-            base[k] = val
+            _assign(base, k, val, key_path)
         else:
             base.pop(k, None)

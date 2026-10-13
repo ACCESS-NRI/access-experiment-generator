@@ -1,7 +1,6 @@
 import sys
 import experiment_generator.experiment_generator as exp_gen
 from experiment_generator.experiment_generator import VALID_MODELS
-from experiment_generator.tmp_parser import yaml_config
 import pytest
 import runpy
 
@@ -90,13 +89,13 @@ def test_main_errors_when_no_yaml_provided_and_default_missing(tmp_path, monkeyp
 def test_exec_main(tmp_path, monkeypatch):
     called = {}
 
-    def dummy_read_yaml(file_path):
-        return {
-            "repository_directory": "test_repo",
-            "control_branch_name": "ctrl",
-            "model_type": VALID_MODELS[0],
-            "test_path": str(tmp_path),
-        }
+    yaml = tmp_path / "dummy.yaml"
+    yaml.write_text(f"""
+repository_directory: test_repo
+control_branch_name: ctrl
+model_type: {VALID_MODELS[0]}
+test_path: {tmp_path}
+""")
 
     class DummyEG:
         def __init__(self, indata):
@@ -105,10 +104,9 @@ def test_exec_main(tmp_path, monkeypatch):
         def run(self):
             called["run"] = True
 
-    monkeypatch.setattr(yaml_config, "read_yaml", dummy_read_yaml, raising=True)
     monkeypatch.setattr(exp_gen, "ExperimentGenerator", DummyEG, raising=True)
 
-    monkeypatch.setattr(sys, "argv", ["prog", "-i", "dummy.yaml"])
+    monkeypatch.setattr(sys, "argv", ["prog", "-i", yaml.as_posix()])
 
     sys.modules.pop("experiment_generator.main", None)
 
