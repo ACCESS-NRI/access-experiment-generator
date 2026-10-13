@@ -1,8 +1,9 @@
 import argparse
 import os
 from importlib.metadata import version, PackageNotFoundError
+from pathlib import Path
 
-from .tmp_parser.yaml_config import read_yaml
+from access.config import YAMLParser
 from .experiment_generator import ExperimentGenerator
 
 
@@ -70,7 +71,7 @@ def main():
         )
 
     # Load the YAML file
-    indata = read_yaml(input_yaml)
+    indata = YAMLParser().parse(Path(input_yaml).read_text(encoding="utf-8"))
 
     # Run the experiment generator
     generator = ExperimentGenerator(indata)

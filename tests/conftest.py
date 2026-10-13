@@ -2,6 +2,7 @@ import pytest
 from pathlib import Path
 import experiment_generator.experiment_generator as exp_gen
 import experiment_generator.perturbation_experiment as pert_exp
+from experiment_generator.config_file_updater import ConfigFileUpdater
 
 
 class DummyBranch:
@@ -78,71 +79,28 @@ class _RecorderBase:
         self.calls.append((method_name, params, filename))
 
 
-class F90Recorder(_RecorderBase):
-    def update_nml_params(self, params, filename, state=None, **kwargs):
-        self._record("update_nml_params", params, filename)
+class ConfigFileRecorder(_RecorderBase):
+    # keep the real dispatch, which decides what reaches the recorder
+    parser_for = staticmethod(ConfigFileUpdater.parser_for)
 
+    def __call__(self, *_):
+        # stands in for the class too: "constructing" it returns the recorder
+        return self
 
-class PayuconfigRecorder(_RecorderBase):
-    def update_config_params(self, params, filename, state=None, **kwargs):
-        self._record("update_config_params", params, filename)
-
-
-class RunconfigRecorder(_RecorderBase):
-    def update_runconfig_params(self, params, filename, state=None, **kwargs):
-        self._record("update_runconfig_params", params, filename)
-
-
-class Mom6Recorder(_RecorderBase):
-    def update_mom6_params(self, params, filename, state=None, **kwargs):
-        self._record("update_mom6_params", params, filename)
-
-
-class RunseqRecorder(_RecorderBase):
-    def update_nuopc_runseq(self, params, filename, state=None, **kwargs):
-        self._record("update_nuopc_runseq", params, filename)
-
-
-class Om2forcingRecorder(_RecorderBase):
-    def update_forcing_params(self, params, filename, state=None, **kwargs):
-        self._record("update_forcing_params", params, filename)
-
-
-class FieldTableRecorder(_RecorderBase):
-    def update_field_table_params(self, params, filename, state=None, **kwargs):
-        self._record("update_field_table_params", params, filename)
+    def update_params(self, params, filename, state=None, **kwargs):
+        self._record("update_params", params, filename)
 
 
 @pytest.fixture(autouse=True)
 def patch_updaters(monkeypatch):
     """
-    Auto-patch the updater classes for testing.
+    Auto-patch the updater class for testing.
     """
-    f90_recorder = F90Recorder()
-    payuconfig_recorder = PayuconfigRecorder()
-    nuopc_runconfig_recorder = RunconfigRecorder()
-    mom6_input_recorder = Mom6Recorder()
-    nuopc_runseq_recorder = RunseqRecorder()
-    om2_forcing_recorder = Om2forcingRecorder()
-    field_table_recorder = FieldTableRecorder()
+    config_file_recorder = ConfigFileRecorder()
 
-    monkeypatch.setattr(pert_exp, "F90NamelistUpdater", lambda *_: f90_recorder)
-    monkeypatch.setattr(pert_exp, "ConfigUpdater", lambda *_: payuconfig_recorder)
-    monkeypatch.setattr(pert_exp, "NuopcRunConfigUpdater", lambda *_: nuopc_runconfig_recorder)
-    monkeypatch.setattr(pert_exp, "Mom6InputUpdater", lambda *_: mom6_input_recorder)
-    monkeypatch.setattr(pert_exp, "NuopcRunseqUpdater", lambda *_: nuopc_runseq_recorder)
-    monkeypatch.setattr(pert_exp, "Om2ForcingUpdater", lambda *_: om2_forcing_recorder)
-    monkeypatch.setattr(pert_exp, "FieldTableUpdater", lambda *_: field_table_recorder)
+    monkeypatch.setattr(pert_exp, "ConfigFileUpdater", config_file_recorder)
 
-    return (
-        f90_recorder,
-        payuconfig_recorder,
-        nuopc_runconfig_recorder,
-        mom6_input_recorder,
-        nuopc_runseq_recorder,
-        om2_forcing_recorder,
-        field_table_recorder,
-    )
+    return config_file_recorder
 
 
 @pytest.fixture

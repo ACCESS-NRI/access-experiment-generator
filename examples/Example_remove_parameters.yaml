@@ -9,6 +9,7 @@
 # Removal rules:
 # - Use 'REMOVE' (as a literal string) to prune a key or element.
 # - Use '~', 'null' or leave the value blank, to explicitly set a parameter to None (kept in config).
+#   `MOM_input` cannot hold None, as MOM6 stops on a parameter with no value: use 'REMOVE' there.
 
 model_type: access-om3 # available models can be checked via `payu list`
 repository_url: git@github.com:ACCESS-NRI/access-om3-configs.git
@@ -21,11 +22,9 @@ control_branch_name: ctrl
 Control_Experiment:
   # Demonstrates parameter removal and setting to None for the control branch.
   #
-  # Example: in `MOM_input`, `USE_RIGID_SEA_ICE` is removed,
-  # while `INIT_LAYERS_FROM_Z_FILE` is set to None.
+  # Example: in `MOM_input`, `USE_RIGID_SEA_ICE` is removed.
   # In `config.yaml`, `exe` is kept with no value and `input` is removed.
   MOM_input:
-    Z_INIT_REMAP_GENERAL: # Explicitly sets this to None (kept in config)
     NUM_DIAG_COORDS: 3
     SEA_ICE_RIGID_MASS: 200
     USE_RIGID_SEA_ICE: REMOVE # Removes this parameter
@@ -43,8 +42,7 @@ Perturbation_Experiment:
 
   # 1. Simple scalar parameters
   # Examples:
-  # - In `MOM_input`, remove `AUTO_IO_LAYOUT_FAC`, set `INIT_LAYERS_FROM_Z_FILE`
-  #   and `Z_INIT_ALE_REMAPPING` to None.
+  # - In `MOM_input`, remove `AUTO_IO_LAYOUT_FAC` and `Z_INIT_ALE_REMAPPING`.
   # - In `ice_in` and `nuopc.runconfig`, remove or null other keys.
   Parameter_block1:
     branches:
@@ -52,8 +50,7 @@ Perturbation_Experiment:
       - perturb_2a
     MOM_input:
       AUTO_IO_LAYOUT_FAC: REMOVE # Removes this parameter
-      INIT_LAYERS_FROM_Z_FILE: ~ # Explicitly sets this to None (kept in config)
-      Z_INIT_ALE_REMAPPING: null # Explicitly sets this to None (kept in config)
+      Z_INIT_ALE_REMAPPING: REMOVE # Removes this parameter
     ice_in:
       thermo_nml:
         dsdt_slow_mode: REMOVE # Removes this parameter
