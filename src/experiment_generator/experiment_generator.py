@@ -1,3 +1,6 @@
+import re
+import shlex
+
 from payu.branch import clone
 from payu.models import index as model_index
 from .perturbation_experiment import PerturbationExperiment
@@ -85,10 +88,12 @@ class ExperimentGenerator(BaseExperiment):
         except Exception as error:
             # Git refuses to read a repository owned by someone else
             # https://github.com/ACCESS-NRI/access-experiment-generator/issues/103
-            if "dubious ownership" not in str(error):
+            match = re.search(r"detected dubious ownership in repository at ['\"](.+?)['\"]", str(error))
+            if match is None:
                 raise
+            unsafe_repository = match.group(1)
             raise RuntimeError(
-                f"Git refuses to read {self.repository_url} because it belongs to another user. "
-                f"To add an exception for this directory, call:\n"
-                f"    git config --global --add safe.directory {self.repository_url}/.git"
+                f"Git refuses to read {unsafe_repository} because it belongs to another user. "
+                "If you trust that repository, add an exception for the exact path Git reported:\n"
+                f"    git config --global --add safe.directory {shlex.quote(unsafe_repository)}"
             ) from error

@@ -195,3 +195,14 @@ def test_clone_repository_does_not_mask_other_errors(tmp_path, base_indata, monk
     monkeypatch.setattr(exp_gen, "clone", failing_clone, raising=True)
     with pytest.raises(RuntimeError, match="some other git failure"):
         eg(base_indata)._clone_repository()
+
+
+def test_clone_repository_reports_exact_dubious_ownership_path(base_indata, monkeypatch):
+    unsafe_repository = "/g/data/project/archive/git-runlog"
+
+    def failing_clone(**kwargs):
+        raise RuntimeError(f"fatal: detected dubious ownership in repository at '{unsafe_repository}'")
+
+    monkeypatch.setattr(exp_gen, "clone", failing_clone, raising=True)
+    with pytest.raises(RuntimeError, match=rf"safe\.directory {unsafe_repository}$"):
+        eg(base_indata)._clone_repository()
