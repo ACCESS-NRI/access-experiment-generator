@@ -55,7 +55,8 @@ git clone https://github.com/ACCESS-NRI/access-experiment-generator.git
 cd access-experiment-generator
 
 # under a virtual environment
-pip install -e .
+python3 -m pip install --upgrade payu
+python3 -m pip install -e '.[devel,test]'
 ```
 
 ## Usage
