@@ -1,7 +1,11 @@
+import re
+import shlex
+
 from payu.branch import clone
 from payu.models import index as model_index
 from .perturbation_experiment import PerturbationExperiment
 from .base_experiment import BaseExperiment
+from .source_experiment import apply_source_experiment
 
 # directly use Payu api
 # https://github.com/payu-org/payu/blob/master/payu/subcommands/list_cmd.py
@@ -26,6 +30,8 @@ class ExperimentGenerator(BaseExperiment):
         Args:
             indata (dict): Dictionary containing input settings from the YAML input.
         """
+        # a source run fills in the control experiment source before anything reads it
+        apply_source_experiment(indata)
         super().__init__(indata)
 
     def run(self) -> None:
@@ -63,7 +69,9 @@ class ExperimentGenerator(BaseExperiment):
         """
         if self.directory.exists():
             print(f"-- Test dir: {self.directory} already exists, hence not cloning {self.repository_url}")
-        else:
+            return
+
+        try:
             clone(
                 repository=self.repository_url,
                 directory=self.directory,
@@ -77,3 +85,15 @@ class ExperimentGenerator(BaseExperiment):
                 parent_experiment=self.parent_experiment,
                 start_point=self.start_point,
             )
+        except Exception as error:
+            # Git refuses to read a repository owned by someone else
+            # https://github.com/ACCESS-NRI/access-experiment-generator/issues/103
+            match = re.search(r"detected dubious ownership in repository at ['\"](.+?)['\"]", str(error))
+            if match is None:
+                raise
+            unsafe_repository = match.group(1)
+            raise RuntimeError(
+                f"Git refuses to read {unsafe_repository} because it belongs to another user. "
+                "If you trust that repository, add an exception for the exact path Git reported:\n"
+                f"    git config --global --add safe.directory {shlex.quote(unsafe_repository)}"
+            ) from error
