@@ -27,9 +27,9 @@ def test_update_config_params_update_params_and_jobname_warning(tmp_path, capsys
 
     with pytest.warns(UserWarning) as record:
         updater.update_config_params(params, config_path, state)
-    assert any(
-        "-- jobname must be the same as" in str(f.message) for f in record
-    ), "Expected jobaname inconsistency warning not showing!"
+    assert any("-- jobname must be the same as" in str(f.message) for f in record), (
+        "Expected jobaname inconsistency warning not showing!"
+    )
 
     updated = read_yaml(config_path)
 

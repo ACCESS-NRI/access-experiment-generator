@@ -38,7 +38,6 @@ def test_base_experiment_defaults_and_paths(tmp_path, monkeypatch):
 
 
 def test_base_experiment_custom_values_and_paths(tmp_path):
-
     # Test with custom values for all keys
     indata = {
         "test_path": "~/custom_test_path",

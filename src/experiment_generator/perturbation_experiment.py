@@ -120,7 +120,7 @@ class PerturbationExperiment(BaseExperiment):
         control_data = self.indata.get("Control_Experiment")
         if control_data is None:
             warnings.warn(
-                "No Control_Experiment block provided in the input YAML file. " "Skipping control branch updates.",
+                "No Control_Experiment block provided in the input YAML file. Skipping control branch updates.",
                 UserWarning,
             )
             return

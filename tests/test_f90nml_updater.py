@@ -62,10 +62,9 @@ def test_group_created_and_vars_set(tmp_path):
 
 
 def test_format_nml_params_boolean_and_list(tmp_path):
-
     nml_file = tmp_path / "test.nml"
     nml_file.write_text(
-        "&tgrp\n" "    flag   = .false.\n" "    items  = 'x', 'y'\n" "/\n",
+        "&tgrp\n    flag   = .false.\n    items  = 'x', 'y'\n/\n",
     )
 
     format_nml_params(
@@ -81,7 +80,7 @@ def test_format_nml_params_boolean_and_list(tmp_path):
 def test_format_nml_params_skips_comment_lines(tmp_path):
     nml_file = tmp_path / "test.nml"
     nml_file.write_text(
-        "&dummy\n" "! flag should not be touched here\n" "    flag = .false.\n" "/\n",
+        "&dummy\n! flag should not be touched here\n    flag = .false.\n/\n",
     )
 
     # expect only the real assignment line to change
@@ -99,7 +98,7 @@ def test_format_nml_params_skips_comment_lines(tmp_path):
 
 def test_format_nml_params_exact_varname_match(tmp_path):
     nml_file = tmp_path / "test.nml"
-    nml_file.write_text("&dummy\n" "    ! days = 99\n" "    days = 30\n" "    days_to_increment = 5\n" "/\n")
+    nml_file.write_text("&dummy\n    ! days = 99\n    days = 30\n    days_to_increment = 5\n/\n")
 
     format_nml_params(
         nml_file.as_posix(),
