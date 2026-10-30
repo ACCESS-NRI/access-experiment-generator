@@ -64,9 +64,7 @@ def _prepare_yaml(config: dict, params: dict, target_file: str, directory: Path)
 
     if "jobname" in params and params["jobname"] != directory.name:
         warnings.warn(
-            f"\n"
-            f"-- jobname must be the same as {directory.name}, "
-            f"hence jobname is forced to be {directory.name}!",
+            f"\n-- jobname must be the same as {directory.name}, hence jobname is forced to be {directory.name}!",
             UserWarning,
         )
     return [(config, {**params, "jobname": directory.name}, target_file)]
