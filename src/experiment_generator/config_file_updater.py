@@ -13,6 +13,7 @@ says which part of it to merge which changes into:
  - Fortran namelists: each group is merged on its own, so that a group left empty stays in the file for
    the model to read; CICE's `turning_angle` is converted to `cosw`/`sinw`; and a string written in
    Fortran syntax is converted to the values it stands for.
+ - `MOM_input`: a parameter given at the top level that the file only has in a block is refused.
  - `atmosphere/forcing.json`: each field is looked up in `inputs`, and its perturbations validated.
 
 Two files are not a merge of the parameters at all, so they apply the parameters themselves:
@@ -178,6 +179,39 @@ def _prepare_namelist(config: dict, params: dict, target_file: str, directory: P
         targets.append((config[group_name], changes, f"{target_file}.{group_name}"))
 
     return targets
+
+
+# --- MOM_input ---
+
+
+def _blocks_holding(config: dict, key: str) -> list[str]:
+    """
+    The names of the parameter blocks (e.g. `MLE` for `MLE%` ... `%MLE`) that hold `key`.
+    """
+    return [name for name, block in config.items() if isinstance(block, dict) and key in block]
+
+
+def _prepare_mom_input(config: dict, params: dict, target_file: str, directory: Path) -> list[MergeTarget]:
+    """
+    Refuse a parameter given at the top level that the file only has in a block.
+
+    A parameter at the top level of the YAML input is a top-level parameter, and the parameters of a
+    block are nested under its name, e.g. `MLE: {USE_BODNER23: false}`. The old parser did not read
+    the blocks, so YAML inputs written for it give them at the top level, where they would be added
+    as new parameters that MOM6 ignores, as they are outside their block.
+    """
+    for key, value in params.items():
+        if isinstance(value, dict) or key in config:
+            continue
+        blocks = _blocks_holding(config, key)
+        if blocks:
+            raise ValueError(
+                f"\n -- {target_file}: '{key}' is in the {', '.join(f'{b}%' for b in blocks)} "
+                f"block{'s' if len(blocks) > 1 else ''}, not at the top level: nest it under its block, "
+                f"e.g. `{blocks[0]}: {{{key}: ...}}`"
+            )
+
+    return _merge_at_root(config, params, target_file, directory)
 
 
 # --- atmosphere/forcing.json (ACCESS-OM2) ---
@@ -515,7 +549,7 @@ _FORMATS = (
     _Format(_is_namelist, FortranNMLParser, _prepare_namelist),
     _Format(lambda filename: filename.endswith(".yaml"), YAMLParser, _prepare_yaml),
     _Format(lambda filename: filename == "nuopc.runconfig", NUOPCParser),
-    _Format(lambda filename: filename == "MOM_input", MOM6InputParser),
+    _Format(lambda filename: filename == "MOM_input", MOM6InputParser, _prepare_mom_input),
     _Format(lambda filename: filename == "atmosphere/forcing.json", JSONParser, _prepare_forcing),
     _Format(lambda filename: filename == "nuopc.runseq", NUOPCRunSeqParser, apply=_apply_runseq),
     _Format(lambda filename: filename.endswith("field_table"), FieldTableParser, apply=_apply_field_table),

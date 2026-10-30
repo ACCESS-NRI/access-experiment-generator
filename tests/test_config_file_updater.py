@@ -489,6 +489,81 @@ def test_turning_angle_remove_when_dynamics_group_missing_is_noop(repo_dir):
     assert parsed["dynamics_nml"] == {}
 
 
+# --- MOM_input ---
+
+
+MOM_INPUT = """DT = 900.0
+MLE%
+USE_BODNER23 = True             !   [Boolean] default = False
+CR = 0.0625
+%MLE
+KPP%
+N_SMOOTH = 2
+ENHANCE_DIFFUSION = False
+%KPP
+"""
+
+
+def test_mom_input_nested_parameter_is_changed_in_its_block(repo_dir, recwarn):
+    _write(repo_dir, "MOM_input", MOM_INPUT)
+    ConfigFileUpdater(repo_dir).update_params({"MLE": {"USE_BODNER23": False}}, "MOM_input")
+
+    assert not [w for w in recwarn if issubclass(w.category, UserWarning)]
+    assert (repo_dir / "MOM_input").read_text() == MOM_INPUT.replace("USE_BODNER23 = True", "USE_BODNER23 = False")
+
+
+def test_mom_input_nested_parameter_is_added_to_its_block(repo_dir):
+    _write(repo_dir, "MOM_input", MOM_INPUT)
+    ConfigFileUpdater(repo_dir).update_params({"MLE": {"MLE_FRONT_LENGTH": 500.0}}, "MOM_input")
+
+    assert (repo_dir / "MOM_input").read_text() == MOM_INPUT.replace("%MLE", "MLE_FRONT_LENGTH = 500.0\n%MLE")
+
+
+@pytest.mark.parametrize(
+    "params, message",
+    [
+        ({"USE_BODNER23": False}, "'USE_BODNER23' is in the MLE% block, not at the top level"),
+        ({"N_SMOOTH": REMOVED}, "'N_SMOOTH' is in the KPP% block, not at the top level"),
+        ({"USE_BODNER23": False, "MLE": {"USE_BODNER23": True}}, "'USE_BODNER23' is in the MLE% block"),
+    ],
+)
+def test_mom_input_flat_parameter_held_by_a_block_is_refused(repo_dir, params, message):
+    """
+    Inputs written for the old parser give the parameters of a block at the top level, where MOM6 would ignore
+    them: they are refused, and the file is left as it is.
+    """
+    path = _write(repo_dir, "MOM_input", MOM_INPUT)
+    with pytest.raises(ValueError, match=message):
+        ConfigFileUpdater(repo_dir).update_params(params, "MOM_input")
+    assert path.read_text() == MOM_INPUT
+
+
+def test_mom_input_flat_parameter_at_the_top_level_or_new_stays_there(repo_dir, recwarn):
+    _write(repo_dir, "MOM_input", MOM_INPUT)
+    ConfigFileUpdater(repo_dir).update_params({"DT": 1800, "NEW_PARAM": 3}, "MOM_input")
+
+    assert not [w for w in recwarn if issubclass(w.category, UserWarning)]
+    parsed = _read(repo_dir, "MOM_input")
+    assert (parsed["DT"], parsed["NEW_PARAM"]) == (1800.0, 3)
+    assert "NEW_PARAM" not in parsed["MLE"] and "NEW_PARAM" not in parsed["KPP"]
+
+
+def test_mom_input_flat_parameter_in_a_block_and_at_the_top_level_is_the_top_level_one(repo_dir, recwarn):
+    _write(repo_dir, "MOM_input", "CR = 1.0\nMLE%\nCR = 0.0625\n%MLE\n")
+    ConfigFileUpdater(repo_dir).update_params({"CR": 2.0}, "MOM_input")
+
+    assert not [w for w in recwarn if issubclass(w.category, UserWarning)]
+    assert (repo_dir / "MOM_input").read_text() == "CR = 2.0\nMLE%\nCR = 0.0625\n%MLE\n"
+
+
+def test_mom_input_flat_parameter_in_several_blocks_is_refused(repo_dir):
+    text = "MLE%\nCR = 0.0625\n%MLE\nKPP%\nCR = 1.0\n%KPP\n"
+    path = _write(repo_dir, "MOM_input", text)
+    with pytest.raises(ValueError, match="'CR' is in the MLE%, KPP% blocks, not at the top level"):
+        ConfigFileUpdater(repo_dir).update_params({"CR": 2.0}, "MOM_input")
+    assert path.read_text() == text
+
+
 # --- atmosphere/forcing.json ---
 
 FORCING_FILE = "atmosphere/forcing.json"
