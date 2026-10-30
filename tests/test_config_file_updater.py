@@ -386,13 +386,15 @@ def test_namelist_shorter_list_replaces_the_old_one(repo_dir, fields_in):
         "/\n",
     )
     ConfigFileUpdater(repo_dir).update_params({"grp": {"fields_in": fields_in, "num_fields_in": 2}}, "input.nml")
-    assert (repo_dir / "input.nml").read_text() == "&grp\n  fields_in = 'u_flux', 'v_flux'\n  num_fields_in = 2\n/\n"
+    assert (repo_dir / "input.nml").read_text() == (
+        "&grp\n    fields_in = 'u_flux', 'v_flux'\n    num_fields_in = 2\n/\n"
+    )
 
 
 def test_namelist_shorter_list_with_markers_keeps_the_tail(repo_dir):
     _write(repo_dir, "ice_in", "&setup_nml\n    histfreq = 'd', 'm', 'x', 'x', 'x'\n/\n")
     ConfigFileUpdater(repo_dir).update_params({"setup_nml": {"histfreq": ["m", PRESERVED]}}, "ice_in", state={})
-    assert (repo_dir / "ice_in").read_text() == "&setup_nml\n  histfreq = 'm', 'm', 'x', 'x', 'x'\n/\n"
+    assert (repo_dir / "ice_in").read_text() == "&setup_nml\n    histfreq = 'm', 'm', 'x', 'x', 'x'\n/\n"
 
 
 @pytest.mark.parametrize(
