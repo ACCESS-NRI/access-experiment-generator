@@ -99,6 +99,7 @@ Perturbation_Experiment:
               - - PRESERVE # keeps all elements under `input` for the 1st branch
               - - REMOVE # removes all element under `input` for the 2nd branch
               - - replace_1st_ncfile_only.nc # replaces the 1st element under `input` for the 3rd branch
+                - PRESERVE # keeps the other elements (without a marker, the list would replace all of `input`)
 
 
   # 4. Nested dicts with branch-indexed fields

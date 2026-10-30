@@ -301,13 +301,59 @@ def test_list_slot_mapping_merge_nested_and_preserve_noop():
 
 def test_recursive_list_merge_basic_replace():
     """
-    Both sides have a list at index 0 -> recurse and replace inner scalars positionally.
+    Both sides have a list at index 0 -> recurse; the inner list has no markers, so it replaces the old one.
     """
     base = {"lst": [[10, 20, 30], "unchanged"]}
-    # only inner first two replaced; third kept
     changes = {"lst": [[1, 2], PRESERVED]}
     update_config_entries(base, changes, pop_key=True)
-    assert base == {"lst": [[1, 2, 30], "unchanged"]}
+    assert base == {"lst": [[1, 2], "unchanged"]}
+
+
+def test_recursive_list_merge_with_markers_keeps_the_tail():
+    """
+    An inner list with a marker is merged by index, so the slots it does not reach are kept.
+    """
+    base = {"lst": [[10, 20, 30], "unchanged"]}
+    changes = {"lst": [[1, PRESERVED], PRESERVED]}
+    update_config_entries(base, changes, pop_key=True)
+    assert base == {"lst": [[1, 20, 30], "unchanged"]}
+
+
+@pytest.mark.parametrize(
+    "change, expected",
+    [
+        ([5, 6], [5, 6]),  # shorter: the old tail is not kept
+        ([5], [5]),
+        ([5, 6, 7, 8, 9], [5, 6, 7, 8, 9]),
+        ([[5, 6]], [[5, 6]]),  # a nested list without markers is a plain value too
+    ],
+)
+def test_update_config_entries_list_without_markers_replaces_the_list(change, expected):
+    base = {"k": [1, 2, 3, 4]}
+    update_config_entries(base, {"k": change})
+    assert base == {"k": expected}
+
+
+def test_update_config_entries_marker_in_a_nested_list_merges_by_index():
+    """
+    A marker at any depth makes the merge positional, so it is never written as a value.
+    """
+    base = {"k": [[1, 2], [3, 4], 5]}
+    update_config_entries(base, {"k": [[PRESERVED, 6], [7]]})
+    assert base == {"k": [[1, 6], [7], 5]}
+
+
+def test_merge_lists_positional_replacement_keeps_the_baseline_for_markers():
+    """
+    A replacement records the list it replaced, so a later run with markers still indexes the original list.
+    """
+    state = {}
+    out = _merge_lists_positional(base_list=[10, 20, 30], change_list=[1], path="k", state=state, pop_key=True)
+    assert out == [1]
+    assert state["k::BASE"] == [10, 20, 30]
+
+    out = _merge_lists_positional(base_list=out, change_list=[PRESERVED, 2], path="k", state=state, pop_key=True)
+    assert out == [10, 2, 30]
 
 
 def test_drop_key_when_cleaned_to_empty_sequence_and_pop_key_true_scalar_base():
@@ -512,6 +558,15 @@ def test_update_config_entries_config_list():
     # every element removed: the entry is removed
     update_config_entries(config, {"ATTRS": {"levels": [REMOVED] * 4}}, state={})
     assert str(config) == "ATTRS::\n  model = mom\n::\n"
+
+
+def test_update_config_entries_config_list_shorter():
+    """
+    A shorter list replaces the old one, even when it matches the start of it.
+    """
+    config = NUOPCParser().parse("ATTRS::\n  levels = 1:10:19\n  model = mom\n::\n")
+    update_config_entries(config, {"ATTRS": {"levels": [1, 10]}}, state={})
+    assert str(config) == "ATTRS::\n  levels = 1:10\n  model = mom\n::\n"
 
 
 def test_update_config_entries_config_unwritable_value():

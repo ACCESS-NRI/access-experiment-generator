@@ -87,6 +87,8 @@ This means every experiment gets `a=10` and `flag="on"`. If you truly need a dif
     - Removal markers: Any of `REMOVE`, `~` and `null`.
     - Empty lists or dicts: If a list or dict ends up empty after filtering, it is also discarded.
 
+  - **2.7 Writing a list into the file:** Once the value for an experiment is chosen, a list in it replaces the whole list in the file, whatever their lengths. A list that holds a `PRESERVE` or `REMOVE` marker (at any depth), or a dict, is instead merged element by element: `PRESERVE` keeps an element, `REMOVE` drops it, and the elements after the end of the list are kept. For example, with `input: [a.nc, b.nc, c.nc]` in the file, `[new.nc]` gives `[new.nc]`, while `[new.nc, PRESERVE]` gives `[new.nc, b.nc, c.nc]`.
+
 This Perturbation Cookbook is meant to serve as a reference for crafting the YAML. If your experiments aren’t behaving as expected, double-check the YAML format against these rules. Additionally, the tool will warn or error out in many cases where the input is ambiguous or inconsistent (for example, if you forgot to provide the `branches` key in a block, it will warn and skip that block).
 
 With a correctly prepared YAML, the `experiment-generator` will handle the heavy lifting of repository cloning, branch management, and file editing, allowing you to focus on analyzing the outcomes of your model experiments.

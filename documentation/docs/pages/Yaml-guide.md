@@ -55,6 +55,7 @@ Some notes:
  - Blocks inside a file are nested in the same way. For example, the parameters in a `KPP%` ... `%KPP` block of `MOM_input` go under `KPP`, e.g. `KPP: {N_SMOOTH: 2}`.
  - Values are written in the notation of the file, and keep the type of the value they replace: `DT: 1800` replaces `DT = 900.0` in `MOM_input` with `DT = 1800.0`, a string is quoted where the file format requires it, and `true` becomes `.true.` in a namelist.
  - A value of `~` (no value) becomes a null value in YAML files, in Fortran namelists (`key =`) and in `nuopc.runconfig` (`key =` in a table, `label:` at the top level), which leaves the variable or attribute at its default. `MOM_input` has no way to write it, as MOM6 stops on a parameter with no value, so use `REMOVE` there instead.
+ - A list replaces the whole list in the file, whatever their lengths: `fields_in: "'u_flux', 'v_flux'"` leaves `fields_in` with exactly these two names. To change only some elements, put `PRESERVE` (keep this element) or `REMOVE` (drop this element) in the list. The list is then merged element by element, and the elements after its end are kept, e.g. `input: [new.nc, PRESERVE]` replaces the first input and keeps all the others.
 
 If `Control_Experiment` is provided, the generator will create the new `ctrl` branch and apply these changes there. It will then commit the changes on that branch. After running the tool, if we check our Git branches, we would see `ctrl` alongside the original branch:
 

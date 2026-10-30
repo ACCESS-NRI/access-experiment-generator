@@ -284,6 +284,21 @@ def test_yaml_remove_top_level_key(repo_dir):
     assert (repo_dir / "config.yaml").read_text() == "jobname: test_repo\nqueue: normal\n"
 
 
+def test_yaml_shorter_list_replaces_the_old_one(repo_dir):
+    """
+    A list without markers is the whole new value: the old elements it leaves out are not kept.
+    """
+    _write(repo_dir, "config.yaml", "jobname: test_repo\ninput:\n    - a.nc\n    - b.nc\n    - c.nc\n")
+    ConfigFileUpdater(repo_dir).update_params({"input": ["new.nc"]}, "config.yaml", state={})
+    assert _read(repo_dir, "config.yaml")["input"] == ["new.nc"]
+
+
+def test_yaml_shorter_list_with_markers_keeps_the_tail(repo_dir):
+    _write(repo_dir, "config.yaml", "jobname: test_repo\ninput:\n  - a.nc\n  - b.nc\n  - c.nc\n")
+    ConfigFileUpdater(repo_dir).update_params({"input": ["new.nc", PRESERVED]}, "config.yaml", state={})
+    assert _read(repo_dir, "config.yaml")["input"] == ["new.nc", "b.nc", "c.nc"]
+
+
 # --- Fortran namelists ---
 
 
@@ -354,6 +369,30 @@ def test_namelist_fortran_text(repo_dir):
     assert (repo_dir / "input.nml").read_text() == (
         "&grp\n  fields_in = 'u_flux', 'v_flux', 'lprec'\n  shape = 'slenderX1'\n  flag = .true.\n/\n"
     )
+
+
+@pytest.mark.parametrize("fields_in", ["'u_flux', 'v_flux'", ["u_flux", "v_flux"]])
+def test_namelist_shorter_list_replaces_the_old_one(repo_dir, fields_in):
+    """
+    A list without markers, in Fortran text or as a YAML list, is the whole new value, also over several lines.
+    """
+    _write(
+        repo_dir,
+        "input.nml",
+        "&grp\n"
+        "    fields_in = 'u_flux', 'v_flux', 'lprec',\n"
+        "                'fprec', 'salt_flx'\n"
+        "    num_fields_in = 5\n"
+        "/\n",
+    )
+    ConfigFileUpdater(repo_dir).update_params({"grp": {"fields_in": fields_in, "num_fields_in": 2}}, "input.nml")
+    assert (repo_dir / "input.nml").read_text() == "&grp\n  fields_in = 'u_flux', 'v_flux'\n  num_fields_in = 2\n/\n"
+
+
+def test_namelist_shorter_list_with_markers_keeps_the_tail(repo_dir):
+    _write(repo_dir, "ice_in", "&setup_nml\n    histfreq = 'd', 'm', 'x', 'x', 'x'\n/\n")
+    ConfigFileUpdater(repo_dir).update_params({"setup_nml": {"histfreq": ["m", PRESERVED]}}, "ice_in", state={})
+    assert (repo_dir / "ice_in").read_text() == "&setup_nml\n  histfreq = 'm', 'm', 'x', 'x', 'x'\n/\n"
 
 
 @pytest.mark.parametrize(

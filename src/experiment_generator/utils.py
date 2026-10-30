@@ -188,11 +188,27 @@ def _assign(base: dict, key, value, path: str) -> None:
         raise ValueError(f"\n -- {path}: cannot write {value!r} to this file: {err}") from err
 
 
+def _is_plain_item(x) -> bool:
+    """
+    Check that `x` holds no "REMOVE"/"PRESERVE" marker and no mapping, at any depth.
+    """
+    if _is_removed_str(x) or _is_preserved_str(x) or isinstance(x, Mapping):
+        return False
+    if _is_seq(x):
+        return all(_is_plain_item(item) for item in x)
+    return True
+
+
 def _merge_lists_positional(
     base_list: list, change_list: list, *, path: str, state: dict | None, pop_key: bool
 ) -> list | None:
     """
-    Merge two lists by index:
+    Merge two lists.
+
+    A non-empty change_list with no "REMOVE"/"PRESERVE" marker and no mapping (at any depth)
+    is the whole new list: it replaces base_list, whatever the lengths of the two lists.
+
+    Any other change_list is merged by index:
 
     - For indices i present in change_list:
         * if change[i] is "PRESERVE" -> keep base[i] as-is (skip)
@@ -223,6 +239,11 @@ def _merge_lists_positional(
         # deepcopy to avoid later mutations affecting the snapshot
         state[base_key] = deepcopy(base_list)
     base0 = state[base_key]  # stable baseline for all runs
+
+    # a list without markers replaces the old one, so that a shorter list does not keep the old tail
+    # (the baseline is still recorded above, for a later run with markers)
+    if change_list and _is_plain_item(change_list):
+        return type(base_list)(_clean_removes(change_list, pop_key=pop_key))
 
     def _baseline_slot(i: int):
         """
@@ -306,6 +327,8 @@ def update_config_entries(
     Recursively update or remove entries in a nested dictionary in place.
 
     - If both base[k] and change[k] are mappings, merge recursively.
+    - If both are lists, a list without "REMOVE"/"PRESERVE" markers or mappings replaces the old one,
+      and any other list is merged by index (see `_merge_lists_positional`).
     - Otherwise, the change is cleaned (via _clean_removes) and assigned.
       Cleaning rules:
         * "REMOVE" in mappings -> drop key (pop_key=True) or set None (pop_key=False).
