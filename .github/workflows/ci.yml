@@ -25,16 +25,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: black
-        uses: psf/black@stable
+      - uses: actions/setup-python@v5
         with:
-          options: "--check --verbose --diff"
-          src: "./src/experiment_generator ./tests"
+          python-version: ${{ env.PY_VERSION_BUILD }}
 
-      - name: flake8
-        uses: py-actions/flake8@v2
-        with:
-          max-line-length: "120"
+      # the hooks of .pre-commit-config.yaml (ruff check and ruff format) on every file, as run locally
+      - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
 
   pypa-build:
     name: PyPA build

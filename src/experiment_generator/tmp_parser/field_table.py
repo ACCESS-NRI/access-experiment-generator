@@ -39,7 +39,6 @@ def _parse_param_blob(blob: str) -> dict:
 
 
 def read_field_table(path) -> dict:
-
     config = {}
 
     current_header: tuple[str, str, str] | None = None  # field_type, model, field

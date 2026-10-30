@@ -36,8 +36,7 @@ Homepage = "https://github.com/ACCESS-NRI/access-experiment-generator"
 
 [project.optional-dependencies]
 devel = [
-    "flake8",
-    "black",
+    "ruff",
     "pre-commit",
 ]
 test = [
@@ -59,8 +58,9 @@ omit = [
   "src/experiment_generator/tmp_parser/*"
   ]
 
-[tool.black]
+[tool.ruff]
 line-length = 120
 
-[tool.flake8]
-max-line-length = 120
+[tool.ruff.lint]
+# the checks flake8 ran: pycodestyle errors (with E501 at 120 characters) and warnings, and pyflakes
+select = ["E", "F", "W"]

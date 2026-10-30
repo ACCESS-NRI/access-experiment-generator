@@ -3,7 +3,6 @@ from experiment_generator.tmp_parser.nuopc_config import read_nuopc_config
 
 
 def test_update_runconfig_params_updates_and_removes(tmp_path):
-
     repo_dir = tmp_path / "test_repo"
     repo_dir.mkdir()
 

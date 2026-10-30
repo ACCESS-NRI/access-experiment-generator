@@ -10,7 +10,7 @@ def test_update_nuopc_runseq_cpl_dt(tmp_path, capsys):
     runseq_path = repo_dir / rel_path
     runseq_path.parent.mkdir(parents=True, exist_ok=True)
     runseq_path.write_text(
-        "runSeq::\n" "@1100\n" "  MED do_something\n" "  OCN do_something\n" "@\n" "::\n",
+        "runSeq::\n@1100\n  MED do_something\n  OCN do_something\n@\n::\n",
     )
 
     updater = NuopcRunseqUpdater(repo_dir)
@@ -31,7 +31,7 @@ def test_update_nuopc_runseq_raises_if_no_at_line(tmp_path):
 
     bad_runseq = repo / "nuopc.runseq"
     bad_runseq.write_text(
-        "runSeq::\n" "  MED do_something\n" "  OCN do_something\n" "@\n" "::\n",
+        "runSeq::\n  MED do_something\n  OCN do_something\n@\n::\n",
     )
 
     updater = NuopcRunseqUpdater(repo)
@@ -50,7 +50,7 @@ def test_update_nuopc_runseq_replace_block_only(tmp_path):
     runseq_path = repo_dir / "nuopc.runseq"
 
     runseq_path.write_text(
-        "runSeq::\n" "@1100\n" "  MED do_something\n" "  OCN do_something\n" "@\n" "::\n",
+        "runSeq::\n@1100\n  MED do_something\n  OCN do_something\n@\n::\n",
     )
 
     new_block = dedent("""
