@@ -347,18 +347,32 @@ def _prepare_forcing(config: dict, params: dict, target_file: str, directory: Pa
 # --- nuopc.runseq ---
 
 _TIME_LOOP = re.compile(r"@\d+(\.\d*)?")
+_RUNSEQ_PARAMS = ("cpl_dt", "runseq_block")
 
 
 def _apply_runseq(config: dict, params: dict, target_file: str, directory: Path, state: dict | None) -> None:
     """
     Replace the whole run sequence by `runseq_block`, or else the first time loop by `@<cpl_dt>`.
+
+    Nothing changes when neither is given, e.g. for a branch whose `cpl_dt` is PRESERVE.
     """
+    unknown = [key for key in params if key not in _RUNSEQ_PARAMS]
+    if unknown:
+        raise ValueError(f"\n -- {target_file}: unknown parameters {unknown}, only {list(_RUNSEQ_PARAMS)} can be set")
+
     if params.get("runseq_block"):
         lines = [line.strip() for line in params["runseq_block"].splitlines() if line.strip()]
         if len(lines) < 2:
             raise ValueError("runseq_block must have at least two lines")
         config["runSeq"] = lines
         return
+
+    cpl_dt = params.get("cpl_dt", PRESERVED)
+    if _is_preserved_str(cpl_dt):
+        return
+    # the new line has to be a time loop itself, so REMOVE, None or a negative value are refused
+    if not _TIME_LOOP.fullmatch(f"@{cpl_dt}"):
+        raise ValueError(f"\n -- {target_file}: cpl_dt must be a number of seconds, not {cpl_dt!r}")
 
     run_sequence = config["runSeq"]
     index = next(
@@ -367,7 +381,7 @@ def _apply_runseq(config: dict, params: dict, target_file: str, directory: Path,
     )
     if index is None:
         raise ValueError("Could not find a line beginning with '@<number>'in nuopc.runseq file")
-    run_sequence[index] = f"@{params['cpl_dt']}"
+    run_sequence[index] = f"@{cpl_dt}"
 
 
 # --- field_table ---

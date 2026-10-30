@@ -786,6 +786,37 @@ def test_runseq_cpl_dt_rewrites_only_the_first_time_loop(repo_dir):
     assert path.read_text() == RUNSEQ.replace("@1100", "@10")
 
 
+@pytest.mark.parametrize("params", [{}, {"cpl_dt": PRESERVED}])
+def test_runseq_without_a_change_is_left_as_it_is(repo_dir, params):
+    """
+    The generator gives no cpl_dt to a branch whose value is PRESERVE.
+    """
+    path = _write(repo_dir, "nuopc.runseq", RUNSEQ)
+
+    ConfigFileUpdater(repo_dir).update_params(params, "nuopc.runseq")
+
+    assert path.read_text() == RUNSEQ
+
+
+@pytest.mark.parametrize("cpl_dt", [REMOVED, None, "fast", -5, True])
+def test_runseq_cpl_dt_that_is_not_a_time_is_refused(repo_dir, cpl_dt):
+    path = _write(repo_dir, "nuopc.runseq", RUNSEQ)
+
+    with pytest.raises(ValueError, match="cpl_dt must be a number of seconds"):
+        ConfigFileUpdater(repo_dir).update_params({"cpl_dt": cpl_dt}, "nuopc.runseq")
+
+    assert path.read_text() == RUNSEQ
+
+
+def test_runseq_unknown_parameter_is_refused(repo_dir):
+    path = _write(repo_dir, "nuopc.runseq", RUNSEQ)
+
+    with pytest.raises(ValueError, match=r"unknown parameters \['cpl_dtt'\]"):
+        ConfigFileUpdater(repo_dir).update_params({"cpl_dtt": 1800}, "nuopc.runseq")
+
+    assert path.read_text() == RUNSEQ
+
+
 def test_runseq_without_a_time_loop_raises(repo_dir):
     _write(repo_dir, "nuopc.runseq", "runSeq::\n  MED do_something\n  OCN do_something\n@\n::\n")
 
