@@ -210,29 +210,74 @@ def test_update_params_list_length_change(repo_dir, change, written):
     )
 
 
-def test_update_params_none_unsupported(repo_dir):
-    """
-    MOM6 stops on a parameter with no value, so MOM_input cannot hold None.
-    """
-    path = _write(repo_dir, "MOM_input", "DT = 900.0\n")
-    with pytest.raises(ValueError, match="cannot write None"):
-        ConfigFileUpdater(repo_dir).update_params({"DT": None}, "MOM_input")
-    assert path.read_text() == "DT = 900.0\n"
+_RUNCONFIG = "DT: 900.0\nDRIVER_attributes::\n  pio_blocksize = -1\n  Verbosity = off\n::\n"
+_FORCING = '{\n  "inputs": [\n    {\n      "fieldname": "tas",\n      "filename": "a.nc"\n    }\n  ]\n}\n'
+_PERTURBATION = {"type": "scaling", "dimension": "constant", "value": 1, "calendar": "forcing"}
 
 
-def test_nuopc_none_and_remove(repo_dir):
+@pytest.mark.parametrize(
+    "filename, text, params",
+    [
+        ("MOM_input", "DT = 900.0\n", {"DT": None}),
+        ("nuopc.runconfig", _RUNCONFIG, {"DT": None}),
+        ("nuopc.runconfig", _RUNCONFIG, {"DRIVER_attributes": {"pio_blocksize": None}}),
+        ("nuopc.runconfig", _RUNCONFIG, {"DRIVER_attributes": {"levels": [1, None]}}),
+        ("ice_in", "&grp\n  inner = 1\n/\n", {"grp": {"inner": None}}),
+        ("ice_in", "&dynamics_nml\n  cosw = 1.0\n  sinw = 0.0\n/\n", {"dynamics_nml": {"turning_angle": None}}),
+        ("atmosphere/forcing.json", _FORCING, {"tas": {"filename": None}}),
+        ("atmosphere/forcing.json", _FORCING, {"tas": {"perturbations": None}}),
+        ("atmosphere/forcing.json", _FORCING, {"tas": {"perturbations": [{**_PERTURBATION, "comment": None}]}}),
+        ("nuopc.runseq", "runSeq::\n@900\n  OCN\n@\n::\n", {"cpl_dt": None}),
+        ("nuopc.runseq", "runSeq::\n@900\n  OCN\n@\n::\n", {"runseq_block": None}),
+        (
+            "field_table",
+            '"prog_tracers","ocean_mod","temp"\nrestart_file  = a.nc\n/\n',
+            {"temp": {"ocean_mod": {"prog_tracers": {"methods": [{"key": "restart_file", "value": None}]}}}},
+        ),
+    ],
+)
+def test_none_is_refused_outside_yaml_files(repo_dir, filename, text, params):
+    """
+    Each format has its own idea of a key with no value (a compiled default, an attribute NUOPC skips, a parameter
+    MOM6 stops on), so ~ is only written to YAML files: REMOVE and PRESERVE say what is meant everywhere else.
+    """
+    path = _write(repo_dir, filename, text)
+
+    with pytest.raises(ValueError, match="can only be written to a YAML file"):
+        ConfigFileUpdater(repo_dir).update_params(params, filename)
+
+    assert path.read_text() == text
+
+
+def test_yaml_none_is_a_null_value(repo_dir):
+    """
+    A key with no value, e.g. a field of a diagnostics table.
+    """
+    _write(repo_dir, "diag_table_source.yaml", "fields:\n  soga:\n  thetaoga:\nmode: on\n")
+
+    ConfigFileUpdater(repo_dir).update_params({"fields": {"total_wfo": None}, "mode": None}, "diag_table_source.yaml")
+
+    assert _read(repo_dir, "diag_table_source.yaml") == {
+        "fields": {"soga": None, "thetaoga": None, "total_wfo": None},
+        "mode": None,
+    }
+
+
+def test_none_in_forcing_perturbations_marked_remove_is_dropped(repo_dir):
+    """
+    The values of a perturbation marked REMOVE are never written, so a ~ among them does not matter.
+    """
+    _write(repo_dir, FORCING_FILE, _FORCING)
+
+    with pytest.warns(UserWarning, match="marked for removal"):
+        ConfigFileUpdater(repo_dir).update_params(
+            {"tas": {"perturbations": [{"type": REMOVED, "dimension": None, "value": None}]}}, FORCING_FILE
+        )
+
+
+def test_nuopc_set_and_remove(repo_dir):
     _write(repo_dir, "nuopc.runconfig", "DT: 900.0\nDRIVER_attributes::\n  pio_blocksize = -1\n  Verbosity = off\n::\n")
     updater = ConfigFileUpdater(repo_dir)
-
-    # None is an entry with no value, which NUOPC leaves unset
-    updater.update_params({"DT": None, "DRIVER_attributes": {"pio_blocksize": None}}, "nuopc.runconfig")
-    assert (repo_dir / "nuopc.runconfig").read_text() == (
-        "DRIVER_attributes::\n  Verbosity = off\n  pio_blocksize =\n::\nDT:\n"
-    )
-    assert _read(repo_dir, "nuopc.runconfig") == {
-        "DRIVER_attributes": {"Verbosity": "off", "pio_blocksize": None},
-        "DT": None,
-    }
 
     updater.update_params({"DRIVER_attributes": {"pio_blocksize": 2}}, "nuopc.runconfig")
     assert _read(repo_dir, "nuopc.runconfig")["DRIVER_attributes"]["pio_blocksize"] == 2
@@ -322,14 +367,9 @@ def test_namelist_group_created_and_vars_set(repo_dir):
     assert parsed["ice_nml"]["B"] == 2
 
 
-def test_namelist_none_and_remove(repo_dir):
+def test_namelist_set_and_remove(repo_dir):
     _write(repo_dir, "ice_in", "&grp\n  inner = 1\n  other = 2\n/\n")
     updater = ConfigFileUpdater(repo_dir)
-
-    # None is a Fortran null value: the variable keeps its default
-    updater.update_params({"grp": {"inner": None}}, "ice_in")
-    assert (repo_dir / "ice_in").read_text() == "&grp\n  other = 2\n  inner =\n/\n"
-    assert _read(repo_dir, "ice_in")["grp"]["inner"] is None
 
     updater.update_params({"grp": {"inner": 2}}, "ice_in")
     assert _read(repo_dir, "ice_in")["grp"]["inner"] == 2
@@ -656,9 +696,9 @@ def test_forcing_all_removed_perturbations_warn_and_skip(repo_dir, forcing_path)
     assert "perturbations" not in tas
 
 
-@pytest.mark.parametrize("empty", [None, {}, []])
-def test_forcing_empty_or_none_perturbations_warn_and_skip(repo_dir, forcing_path, empty):
-    with pytest.warns(UserWarning, match="empty/None 'perturbations'"):
+@pytest.mark.parametrize("empty", [{}, []])
+def test_forcing_empty_perturbations_warn_and_skip(repo_dir, forcing_path, empty):
+    with pytest.warns(UserWarning, match="empty 'perturbations'"):
         ConfigFileUpdater(repo_dir).update_params({"tas": {"filename": "x.nc", "perturbations": empty}}, FORCING_FILE)
 
     tas = _forcing_field(forcing_path, "tas")
@@ -798,7 +838,7 @@ def test_runseq_without_a_change_is_left_as_it_is(repo_dir, params):
     assert path.read_text() == RUNSEQ
 
 
-@pytest.mark.parametrize("cpl_dt", [REMOVED, None, "fast", -5, True])
+@pytest.mark.parametrize("cpl_dt", [REMOVED, "fast", -5, True])
 def test_runseq_cpl_dt_that_is_not_a_time_is_refused(repo_dir, cpl_dt):
     path = _write(repo_dir, "nuopc.runseq", RUNSEQ)
 

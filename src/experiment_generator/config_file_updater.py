@@ -21,6 +21,9 @@ Two files are not a merge of the parameters at all, so they apply the parameters
    a whole new run sequence.
  - `field_table`: the parameters are laid out by field, model and field type, with the methods of each
    entry as a list, and are merged on that layout before only the lines that changed are written.
+
+A value of ~ (None) is only written to YAML files, as a null value. Every other file refuses it: each
+format has its own idea of a key with no value, and REMOVE and PRESERVE say what is meant instead.
 """
 
 import math
@@ -51,6 +54,25 @@ MergeTarget = tuple[dict, dict, str]
 
 def _merge_at_root(config: dict, params: dict, target_file: str, directory: Path) -> list[MergeTarget]:
     return [(config, params, target_file)]
+
+
+def _refuse_none(params: dict, path: str) -> None:
+    """
+    Refuse ~ (None) in the changes to a file that is not a YAML file.
+    """
+    for key, value in params.items():
+        key_path = f"{path}.{key}"
+        if value is None or (isinstance(value, list) and None in value):
+            raise ValueError(
+                f"\n -- {key_path}: ~ (no value) can only be written to a YAML file: use REMOVE to remove it "
+                "(the model then uses its default) or PRESERVE to keep its value"
+            )
+        if isinstance(value, dict):
+            _refuse_none(value, key_path)
+        elif isinstance(value, list):
+            for i, item in enumerate(value):
+                if isinstance(item, dict):
+                    _refuse_none(item, f"{key_path}[{i}]")
 
 
 # --- config.yaml ---
@@ -138,7 +160,7 @@ def _turning_angle_changes(config: dict, turning_angle) -> dict:
     if _is_removed_str(turning_angle):
         return {"cosw": REMOVED, "sinw": REMOVED}
 
-    if _is_preserved_str(turning_angle) or turning_angle is None:
+    if _is_preserved_str(turning_angle):
         dyn = config.get("dynamics_nml", {})
         if "cosw" not in dyn and "sinw" not in dyn:
             raise ValueError("Cannot preserve turning_angle: no existing cosw and sinw found in `dynamics_nml`")
@@ -169,6 +191,8 @@ def _prepare_namelist(config: dict, params: dict, target_file: str, directory: P
 
         # `turning_angle` is never written itself: in CICE namelists, it sets cosw and sinw instead
         if group_name == "dynamics_nml" and "turning_angle" in changes:
+            # checked here, as it is not among the changes returned
+            _refuse_none({"turning_angle": changes["turning_angle"]}, f"{target_file}.{group_name}")
             turning_angle = changes.pop("turning_angle")
             if target_file.endswith(CICE_NAMELISTS):
                 # an explicit cosw or sinw takes precedence
@@ -254,10 +278,10 @@ def _preprocess_perturbations(fieldname: str, updates: dict) -> None:
     """
     perts = updates.get("perturbations")
 
-    # treat falsy as "no change"
-    if perts in (None, {}, []):
+    # treat empty as "no change"
+    if perts in ({}, []):
         warnings.warn(
-            f"-- forcing.json '{fieldname}': empty/None 'perturbations' provided; skipping.",
+            f"-- forcing.json '{fieldname}': empty 'perturbations' provided; skipping.",
             UserWarning,
         )
         updates.pop("perturbations", None)
@@ -322,6 +346,9 @@ def _prepare_forcing(config: dict, params: dict, target_file: str, directory: Pa
         updates = dict(field_updates)
         if "perturbations" in updates:
             perts = updates["perturbations"]
+            if perts is None:
+                # checked here, as an empty set of perturbations is dropped below
+                _refuse_none({"perturbations": perts}, f"{target_file}.{fieldname}")
             if _is_preserved_str(perts) or (
                 isinstance(perts, list) and len(perts) == 1 and _is_preserved_str(perts[0])
             ):
@@ -370,7 +397,7 @@ def _apply_runseq(config: dict, params: dict, target_file: str, directory: Path,
     cpl_dt = params.get("cpl_dt", PRESERVED)
     if _is_preserved_str(cpl_dt):
         return
-    # the new line has to be a time loop itself, so REMOVE, None or a negative value are refused
+    # the new line has to be a time loop itself, so REMOVE or a negative value are refused
     if not _TIME_LOOP.fullmatch(f"@{cpl_dt}"):
         raise ValueError(f"\n -- {target_file}: cpl_dt must be a number of seconds, not {cpl_dt!r}")
 
@@ -553,6 +580,8 @@ class _Format:
     prepare: Callable[[dict, dict, str, Path], list[MergeTarget]] = _merge_at_root
     # takes the place of `prepare` and the generic merge, for a file whose parameters are not a merge
     apply: Callable[[dict, dict, str, Path, dict | None], None] | None = None
+    # whether ~ (None) can be written, as a null value
+    accepts_none: bool = False
 
 
 def _is_namelist(filename: str) -> bool:
@@ -561,7 +590,7 @@ def _is_namelist(filename: str) -> bool:
 
 _FORMATS = (
     _Format(_is_namelist, FortranNMLParser, _prepare_namelist),
-    _Format(lambda filename: filename.endswith(".yaml"), YAMLParser, _prepare_yaml),
+    _Format(lambda filename: filename.endswith(".yaml"), YAMLParser, _prepare_yaml, accepts_none=True),
     _Format(lambda filename: filename == "nuopc.runconfig", NUOPCParser),
     _Format(lambda filename: filename == "MOM_input", MOM6InputParser, _prepare_mom_input),
     _Format(lambda filename: filename == "atmosphere/forcing.json", JSONParser, _prepare_forcing),
@@ -611,9 +640,14 @@ class ConfigFileUpdater:
         config = fmt.parser().parse(path.read_text(encoding="utf-8"))
 
         if fmt.apply is not None:
+            if not fmt.accepts_none:
+                _refuse_none(param_dict, filename)
             fmt.apply(config, param_dict, filename, self.directory, state)
         else:
             for base, changes, change_path in fmt.prepare(config, param_dict, filename, self.directory):
+                # the changes as they will be written, e.g. without the perturbations marked REMOVE
+                if not fmt.accepts_none:
+                    _refuse_none(changes, change_path)
                 update_config_entries(base, changes, pop_key=True, path=change_path, state=state)
 
         # write to a temporary file first, so that a failure cannot leave the file half written

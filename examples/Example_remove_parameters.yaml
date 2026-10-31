@@ -3,13 +3,14 @@
 # Adjust the settings below as needed for your environment and model.
 #
 # NOTE: This file is for demonstration purposes only.
-# It shows how to mark parameters for removal or for being set to None.
+# It shows how to mark parameters for removal, and how to set a key of a YAML file to null.
 # The parameter choices below are not scientifically meaningful!
 #
 # Removal rules:
 # - Use 'REMOVE' (as a literal string) to prune a key or element.
-# - Use '~', 'null' or leave the value blank, to explicitly set a parameter to None (kept in config).
-#   `MOM_input` cannot hold None, as MOM6 stops on a parameter with no value: use 'REMOVE' there.
+# - Use '~', 'null' or leave the value blank to set a key to null (kept in the file), in YAML files
+#   only, e.g. `config.yaml`. Every other file refuses it: use 'REMOVE' to remove a key (the model
+#   then uses its default) or 'PRESERVE' to keep its value.
 
 model_type: access-om3 # available models can be checked via `payu list`
 repository_url: git@github.com:ACCESS-NRI/access-om3-configs.git
@@ -20,7 +21,7 @@ repository_directory: MC_25km_jra_ryf # Local directory name for the central rep
 control_branch_name: ctrl
 
 Control_Experiment:
-  # Demonstrates parameter removal and setting to None for the control branch.
+  # Demonstrates parameter removal, and a null value in a YAML file, for the control branch.
   #
   # Example: in `MOM_input`, `USE_RIGID_SEA_ICE` is removed.
   # In `config.yaml`, `exe` is kept with no value and `input` is removed.
@@ -38,12 +39,12 @@ Control_Experiment:
       enable: false
 
 Perturbation_Experiment:
-  # Shows how to remove or null parameters for perturbation branches.
+  # Shows how to remove parameters for perturbation branches.
 
   # 1. Simple scalar parameters
   # Examples:
   # - In `MOM_input`, remove `AUTO_IO_LAYOUT_FAC` and `Z_INIT_ALE_REMAPPING`.
-  # - In `ice_in` and `nuopc.runconfig`, remove or null other keys.
+  # - In `ice_in` and `nuopc.runconfig`, remove other keys.
   Parameter_block1:
     branches:
       - perturb_1a
@@ -55,10 +56,10 @@ Perturbation_Experiment:
       thermo_nml:
         dsdt_slow_mode: REMOVE # Removes this parameter
       shortwave_nml:
-        ahmax: ~ # Explicitly sets to None
+        ahmax: REMOVE # Removes this parameter, so CICE uses its compiled default
     nuopc.runconfig:
       DRIVER_attributes:
-        pio_blocksize: null # Explicitly sets to None
+        pio_blocksize: REMOVE # Removes this attribute
 
   # 2. list parameters
   # Remove `AUTO_IO_LAYOUT_FAC` only for `perturb_2b`.

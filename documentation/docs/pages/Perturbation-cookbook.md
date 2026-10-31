@@ -84,7 +84,7 @@ This means every experiment gets `a=10` and `flag="on"`. If you truly need a dif
 
   - **2.6 Filtering and removal rules:** The generator applies automatic filtering rules to clean up lists and dictionaries. This prevents placeholders or "removed" markers from leaking into the final configurations.
 
-    - Removal markers: Any of `REMOVE`, `~` and `null`.
+    - Removal marker: `REMOVE`. `~` and `null` are not markers: they are a null value, which only YAML files accept (use `REMOVE` or `PRESERVE` in any other file).
     - Empty lists or dicts: If a list or dict ends up empty after filtering, it is also discarded.
 
   - **2.7 Writing a list into the file:** Once the value for an experiment is chosen, a list in it replaces the whole list in the file, whatever their lengths. A list that holds a `PRESERVE` or `REMOVE` marker (at any depth), or a dict, is instead merged element by element: `PRESERVE` keeps an element, `REMOVE` drops it, and the elements after the end of the list are kept. For example, with `input: [a.nc, b.nc, c.nc]` in the file, `[new.nc]` gives `[new.nc]`, while `[new.nc, PRESERVE]` gives `[new.nc, b.nc, c.nc]`.
