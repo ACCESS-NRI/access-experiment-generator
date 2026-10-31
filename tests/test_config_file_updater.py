@@ -73,6 +73,19 @@ def test_update_params_unsupported_file_raises(repo_dir):
         ConfigFileUpdater(repo_dir).update_params({}, "other.json")
 
 
+def test_update_params_file_the_parser_cannot_read_is_named(repo_dir):
+    """
+    The parser's own message says where in the file it stopped, but not which file it was reading.
+    """
+    path = _write(repo_dir, "ice/cice_in.nml", "&grp\n  a = 1\n")  # a group that is never closed
+
+    with pytest.raises(ValueError, match=r"ice/cice_in.nml: FortranNMLParser cannot read this file") as err:
+        ConfigFileUpdater(repo_dir).update_params({"grp": {"a": 2}}, "ice/cice_in.nml")
+
+    assert str(err.value.__cause__) in str(err.value)
+    assert path.read_text() == "&grp\n  a = 1\n"
+
+
 # --- one generic merge for every format: update, add, REMOVE, PRESERVE ---
 
 
@@ -1149,6 +1162,28 @@ def test_a_value_of_another_type_is_written_anew(repo_dir):
 
     assert FieldTableParser().parse(updated)["prog_tracers"]["ocean_mod"]["temp"]["restart_file"] == 5
     assert "ocean_temp_salt.res.nc" not in updated
+
+
+def test_values_from_the_yaml_input_are_written(repo_dir):
+    """
+    The YAML input is loaded round-trip, so a float in it, as a method's value or as one of its parameters, is
+    ruamel.yaml's ScalarFloat rather than a float.
+    """
+    params = YAMLParser().parse(
+        "temp:\n"
+        "  ocean_mod:\n"
+        "    prog_tracers:\n"
+        "      methods: [PRESERVE, PRESERVE, {key: min_tracer_limit, value: 0.5}]\n"
+        "sphum:\n"
+        "  atmos_mod:\n"
+        "    TRACER:\n"
+        "      methods: [PRESERVE, {key: profile_type, value: fixed, params: {surface_value: 1e-6}}]\n"
+    )
+
+    updated = _update_field_table(repo_dir, params)
+
+    assert FieldTableParser().parse(updated)["prog_tracers"]["ocean_mod"]["temp"]["min_tracer_limit"] == 0.5
+    assert '"profile_type", "fixed", "surface_value=1e-06" /' in updated
 
 
 @pytest.mark.parametrize(

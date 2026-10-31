@@ -46,7 +46,7 @@ from access.config import (
 from access.config.config_dict import ConfigBlockList
 
 from .common_var import PRESERVED, REMOVED, _is_preserved_str, _is_removed_str
-from .utils import update_config_entries
+from .utils import _plain, update_config_entries
 
 # A part of a parsed file, the changes to merge into it, and the path to report them under
 MergeTarget = tuple[dict, dict, str]
@@ -482,7 +482,11 @@ def prune_empty_field_table_config(config: dict) -> None:
 def _typed(value):
     """
     Return the number a string spells, as the field table parser reads one, or the value itself.
+
+    The value is made a builtin first: the YAML input is loaded round-trip, so a float in it is
+    ruamel.yaml's `ScalarFloat`, which the parsed field table refuses, as a parsed `Config` does.
     """
+    value = _plain(value)
     if isinstance(value, str):
         for convert in (int, float):
             try:
@@ -679,7 +683,14 @@ class ConfigFileUpdater:
             raise ValueError(f"No parser available for {filename}")
 
         path = self.directory / filename
-        config = fmt.parser().parse(path.read_text(encoding="utf-8"))
+        text = path.read_text(encoding="utf-8")
+        try:
+            config = fmt.parser().parse(text)
+        except Exception as err:
+            # the parser's message gives the line and the column, but not the file
+            raise ValueError(
+                f"\n -- {filename}: {fmt.parser.__name__} cannot read this file, so it is not changed:\n{err}"
+            ) from err
 
         if fmt.apply is not None:
             if not fmt.accepts_none:
