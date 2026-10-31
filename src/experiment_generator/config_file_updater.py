@@ -104,11 +104,13 @@ _FORTRAN_REAL = re.compile(r"[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eEdD][+-]?\d+)?")
 _FORTRAN_LOGICALS = {".true.": True, ".t.": True, ".false.": False, ".f.": False}
 
 
-def _fortran_constant(text: str) -> tuple[bool, object]:
+def _fortran_constant(text: str, as_string: bool = False) -> tuple[bool, object]:
     """
     Convert the text of one Fortran constant to its Python value.
 
-    Returns whether the text is a Fortran constant, and its value if it is.
+    Returns whether the text is a Fortran constant, and its value if it is. With `as_string`, for a
+    variable that holds strings, unquoted text is the string it spells (e.g. `001` or `m`), not a number
+    or a logical.
     """
     text = text.strip()
     match = _FORTRAN_STRING.fullmatch(text)
@@ -116,6 +118,8 @@ def _fortran_constant(text: str) -> tuple[bool, object]:
         if match.group(1) is not None:
             return True, match.group(1).replace("''", "'")
         return True, match.group(2).replace('""', '"')
+    if as_string:
+        return True, text
     if text.lower() in _FORTRAN_LOGICALS:
         return True, _FORTRAN_LOGICALS[text.lower()]
     if _FORTRAN_INTEGER.fullmatch(text):
@@ -125,7 +129,36 @@ def _fortran_constant(text: str) -> tuple[bool, object]:
     return False, text
 
 
-def _from_fortran_text(value):
+def _split_fortran_list(text: str) -> list[str]:
+    """
+    Split the text of a list of Fortran constants at the commas that are not inside quotes.
+    """
+    items, item, quote = [], "", None
+    for char in text:
+        if quote:
+            # a doubled quote inside a string closes and opens it again
+            if char == quote:
+                quote = None
+        elif char in "'\"":
+            quote = char
+        elif char == ",":
+            items.append(item)
+            item = ""
+            continue
+        item += char
+    return [*items, item]
+
+
+def _holds_strings(current) -> bool:
+    """
+    Whether the value in the file is a string, or a list of strings.
+    """
+    if isinstance(current, list):
+        return bool(current) and all(isinstance(item, str) for item in current)
+    return isinstance(current, str)
+
+
+def _from_fortran_text(value, current=None):
     """
     Convert a string written in Fortran syntax to the value(s) it stands for.
 
@@ -133,19 +166,27 @@ def _from_fortran_text(value):
     text itself, e.g. `fields_in: "'u_flux', 'v_flux'"`, `processor_shape: "'slenderX1'"` or
     `flag: .true.` (which YAML reads as a string). A string that is a Fortran constant, or a
     comma-separated list of them, is converted; anything else is left as the string it is.
+
+    `current`, the value in the file, tells a string from a number: where the file holds a string,
+    unquoted text is that string (e.g. `001`), and where it holds a list of strings, unquoted items are
+    strings (e.g. `m, d, x`). Elsewhere, e.g. for a new variable, numbers and logicals are converted.
     """
     if not isinstance(value, str):
         return value
+    as_string = _holds_strings(current)
+    if as_string and not isinstance(current, list):
+        # a string variable: its new value is the text, without the quotes if it has them
+        return _fortran_constant(value, as_string=True)[1]
 
     # a single string constant may itself contain commas
     is_constant, constant = _fortran_constant(value)
     if is_constant:
         return constant
 
-    items = value.split(",")
+    items = _split_fortran_list(value)
     if len(items) == 1:
         return value
-    constants = [_fortran_constant(item) for item in items]
+    constants = [_fortran_constant(item, as_string) for item in items]
     if not all(is_constant for is_constant, _ in constants):
         return value
     return [constant for _, constant in constants]
@@ -187,7 +228,8 @@ def _prepare_namelist(config: dict, params: dict, target_file: str, directory: P
                 "so it is not clear which one to update!"
             )
 
-        changes = {var: _from_fortran_text(value) for var, value in group_value.items()}
+        group = config.get(group_name) or {}
+        changes = {var: _from_fortran_text(value, group.get(var)) for var, value in group_value.items()}
 
         # `turning_angle` is never written itself: in CICE namelists, it sets cosw and sinw instead
         if group_name == "dynamics_nml" and "turning_angle" in changes:

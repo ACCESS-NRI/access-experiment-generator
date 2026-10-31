@@ -1,0 +1,109 @@
+# Experiment Configuration File
+# This example shows how to write the values of Fortran namelist variables, e.g. in
+# `accessom2.nml`, `ice/cice_in.nml`, `ice/input_ice.nml` and `ocean/input.nml`.
+# The values only show the syntax: they are not scientifically meaningful!
+#
+# A value can be written in either of two forms, which write the same text into the file:
+# - plain YAML: a number, `true`/`false`, a string, or a list `[...]`;
+# - Fortran text, as in the namelist itself, in quotes: "0,0,86400", "'slenderX1'", ".true.".
+#   Where the file holds a string, the text is that string, with or without its quotes, and
+#   where it holds a list of strings, "m, d, x" is a list of three strings.
+# Either way, the namelist is written in its own notation: a list as `0, 0, 86400`, `true`
+# as `.true.`, and a string in the quotes the file already uses ('...' or "...").
+#
+# Only the value changes. The alignment, the comments and the other assignments on the same
+# line (e.g. `f_sig1 = 'x', f_sig2 = 'x'` in an ACCESS-OM3 ice_in) are kept, and a list that
+# runs over several lines keeps its layout: a shorter one ends sooner, and a longer one goes
+# on from its last line.
+#
+# An empty string is written "" (or "''"). A blank value or ~ is no value, not an empty
+# string, and a namelist refuses it: use REMOVE to remove a variable, so that the model uses
+# its default.
+#
+# In a Perturbation_Experiment block, a list gives one value per branch. So a value that is
+# itself a list is wrapped in one more list (`[[0, 0, 86400]]`), or written as Fortran text,
+# which is a single string, and so the same for every branch.
+
+model_type: access-om2 # available models can be checked via `payu list`
+repository_url: git@github.com:ACCESS-NRI/access-om2-configs.git
+start_point: "fce24e3" # Control commit hash for new branches
+test_path: prototype-namelist-values # All control and perturbation experiment repositories will be created here; can be relative, absolute or ~ (user-defined)
+repository_directory: 1deg_jra55_ryf # Local directory name for the central repository (user-defined)
+
+control_branch_name: ctrl
+
+Control_Experiment:
+  # Each value below can also be written as the Fortran text after `or`, with the same result.
+  accessom2.nml:
+    date_manager_nml:
+      restart_period: [0, 0, 86400] # or "0,0,86400"           -> restart_period = 0, 0, 86400
+  ice/cice_in.nml:
+    domain_nml:
+      processor_shape: slenderX1 # or "'slenderX1'"            -> processor_shape = 'slenderX1'
+      distribution_type: sectrobin # or "'sectrobin'"          -> distribution_type = 'sectrobin'
+    setup_nml:
+      histfreq: [m, d, x, x, x] # or "'m','d','x','x','x'", or "m, d, x, x, x"
+      print_global: true # or ".true."                          -> print_global = .true.
+    icefields_nml:
+      f_sig1: m # or "'m'"                                       -> f_sig1 = 'm'
+  ice/input_ice.nml:
+    coupling_nml:
+      ice_fwflux: false # or ".false."                         -> ice_fwflux = .false.
+  ocean/input.nml:
+    ocean_model_nml:
+      layout: [30, 20] # or "30, 20"                            -> layout = 30, 20
+
+Perturbation_Experiment:
+  # 1. The same list value for every branch
+  Parameter_block1:
+    branches:
+      - perturb_1a
+      - perturb_2a
+    accessom2.nml:
+      date_manager_nml:
+        # [[...]] is one list for every branch, as is "0,0,86400".
+        # Not [0, 0, 86400]: that is one value per branch, which is an error here, with two
+        # branches, and with three branches would give them 0, 0 and 86400 each.
+        restart_period: [[0, 0, 86400]]
+
+  # 2. A value per branch: lists, strings and logicals
+  Parameter_block2:
+    branches:
+      - perturb_1b
+      - perturb_2b
+    accessom2.nml:
+      date_manager_nml:
+        restart_period:
+          - [0, 0, 86400] # perturb_1b
+          - [1, 0, 0] # perturb_2b
+    ice/cice_in.nml:
+      domain_nml:
+        distribution_type: [roundrobin, sectrobin] # perturb_1b, perturb_2b
+      setup_nml:
+        histfreq:
+          - [m, d, x, x, x] # perturb_1b
+          - [d, m, x, x, x] # perturb_2b
+        restart_ext: [false, true] # perturb_1b, perturb_2b; or [".false.", ".true."]
+
+  # 3. The same values as in 2, as Fortran text: one string per branch
+  Parameter_block3:
+    branches:
+      - perturb_1c
+      - perturb_2c
+    accessom2.nml:
+      date_manager_nml:
+        restart_period: ["0,0,86400", "1,0,0"]
+    ice/cice_in.nml:
+      setup_nml:
+        histfreq: ["'m','d','x','x','x'", "d, m, x, x, x"]
+
+  # 4. A list that runs over several lines
+  Parameter_block4:
+    branches:
+      - perturb_1d
+    ice/input_ice.nml:
+      coupling_nml:
+        # As for any list, this is the whole new list. It has one name fewer than the file,
+        # so the third line of the list, which held only `licalvf_i`, goes.
+        fields_from_atm:
+          - [swfld_i, lwfld_i, rain_i, snow_i, press_i, runof_i, tair_i, qair_i, uwnd_i, vwnd_i]

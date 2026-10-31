@@ -444,6 +444,8 @@ def test_namelist_shorter_list_with_markers_keeps_the_tail(repo_dir):
         ('"it""s"', 'it"s'),
         ("'it''s, mine'", "it's, mine"),
         ("'a', 'b'", ["a", "b"]),
+        ("'a,b', 'c'", ["a,b", "c"]),
+        ("'it''s, mine', \"x\"", ["it's, mine", "x"]),
         ("1, 2.5, 3d-2, .TRUE., .f.", [1, 2.5, 0.03, True, False]),
         (" 42 ", 42),
         (".false.", False),
@@ -457,6 +459,38 @@ def test_namelist_shorter_list_with_markers_keeps_the_tail(repo_dir):
 )
 def test_from_fortran_text(value, expected):
     assert _from_fortran_text(value) == expected
+
+
+@pytest.mark.parametrize(
+    "value, current, expected",
+    [
+        # a string variable keeps the text, with or without quotes
+        ("001", "square-ice", "001"),
+        (".true.", "square-ice", ".true."),
+        ("a, b", "square-ice", "a, b"),
+        ("'slenderX1'", "square-ice", "slenderX1"),
+        # a list of strings takes unquoted items as strings
+        ("m, d, x", ["d", "m", "x"], ["m", "d", "x"]),
+        ("'m,x', 1", ["d", "m"], ["m,x", "1"]),
+        # a number, or a variable not in the file yet, is converted as before
+        ("001", -1, 1),
+        ("001", None, 1),
+        ("30, 20", [48, 40], [30, 20]),
+    ],
+)
+def test_from_fortran_text_follows_the_type_in_the_file(value, current, expected):
+    assert _from_fortran_text(value, current) == expected
+
+
+def test_namelist_text_for_string_variables(repo_dir):
+    """
+    The type of each variable in the file tells a string from a number, and a quoted comma stays in its string.
+    """
+    _write(repo_dir, "ice_in", "&grp\n  shape = 'square-ice'\n  freq = 'd', 'm', 'x'\n  n = -1\n/\n")
+
+    ConfigFileUpdater(repo_dir).update_params({"grp": {"shape": "001", "freq": "'m,x', d, x", "n": "5"}}, "ice_in")
+
+    assert (repo_dir / "ice_in").read_text() == "&grp\n  shape = '001'\n  freq = 'm,x', 'd', 'x'\n  n = 5\n/\n"
 
 
 def test_turning_angle_compute_and_deletes_key(repo_dir):
