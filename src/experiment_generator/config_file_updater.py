@@ -338,7 +338,10 @@ def _preprocess_perturbations(fieldname: str, updates: dict) -> None:
     # cleaned is list of dicts
     cleaned = []
     for p in perts:
-        q = dict(p)
+        # A value given once for every branch arrives as a one-element list, which the merge would
+        # unwrap for a key of the file but not inside a new perturbation. No field of a perturbation is
+        # a one-element list (a separable one has two dimensions and two files), so unwrap it here.
+        q = {k: v[0] if isinstance(v, list) and len(v) == 1 else v for k, v in p.items()}
         t_ = q.get("type")
 
         # skip if REMOVED, and if PRESERVE keep the existing perturbation at this index

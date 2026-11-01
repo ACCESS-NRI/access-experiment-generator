@@ -687,6 +687,19 @@ def test_forcing_single_perturbation_is_written_as_list(repo_dir, forcing_path):
     assert _forcing_field(forcing_path, "tas")["perturbations"] == [_pert()]
 
 
+def test_forcing_value_given_for_every_branch_is_written_as_the_value(repo_dir, forcing_path):
+    """
+    A field given once for every branch reaches the updater as a one-element list, e.g. `dimension: [spatial]`,
+    while the two dimensions and the two files of a separable perturbation stay lists.
+    """
+    broadcast = {k: [v] for k, v in _pert(dimension="spatial").items()}
+    separable = _pert(type="separable", dimension=["temporal", "spatial"], value=["t.nc", "s.nc"])
+
+    ConfigFileUpdater(repo_dir).update_params({"tas": {"perturbations": [broadcast, separable]}}, FORCING_FILE)
+
+    assert _forcing_field(forcing_path, "tas")["perturbations"] == [_pert(dimension="spatial"), separable]
+
+
 def test_forcing_update_fields(repo_dir, forcing_path):
     params = {
         "tas": {
@@ -769,7 +782,6 @@ def test_forcing_invalid_perturbations_type_raises(repo_dir, forcing_path, inval
         pytest.param(_pert(type="nonsense"), id="wrong-type"),
         pytest.param(_pert(dimension=123), id="int-dimension"),
         pytest.param(_pert(dimension="space"), id="wrong-dimension"),
-        pytest.param(_pert(dimension=["temporal"]), id="short-dimension"),
         pytest.param(_pert(dimension=["temporal", "spatial", "x"]), id="long-dimension"),
         pytest.param(_pert(calendar=""), id="empty-calendar"),
         pytest.param(_pert(calendar=None), id="no-calendar"),
