@@ -15,15 +15,10 @@ The project is organised with the following components,
 ├── src                                 
 │   └── experiment_generator              # source code
 │       ├── base_experiment.py            # Common path+repo config helpers
-│       ├── config_updater.py             # Payu configuration updater
+│       ├── config_file_updater.py        # The updater: edits every config file in place, with the access-config-utils parsers
 │       ├── experiment_generator.py       # Orchestrator (end-to-end flow)
-│       ├── f90nml_updater.py             # Fortran namelist configuration updater
 │       ├── main.py                       # CLI entrypoint - loads YAML, runs Orchestrator
-│       ├── mom6_input_updater.py         # MOM6 configuration updater
-│       ├── nuopc_runconfig_updater.py    # nuopc.runconfig configuration updater
-│       ├── nuopc_runseq_updater.py       # nuopc.runseq configuration updater
 │       ├── perturbation_experiment.py    # Houses control/perturbation setups
-│       ├── tmp_parser/                   # temporary configuration parsers, this will be replaced by https://github.com/ACCESS-NRI/access-parsers
 │       └── utils.py                      # Helpers
 ├── .github/workflows/                    # CI/CD
 └── tests                                 # Unittests suite
@@ -42,3 +37,4 @@ Some major components are explained a bit as follows,
       3. a dict of file parameters to change. 
 
    - The generator flattens the nested YAML definitions into a list of `ExperimentDefinition` objects, each corresponding to one experiment case, before actually creating branches and applying changes.
+- `config_file_updater.py`: Applies the changes to a configuration file. The files are read with the round-trip parsers from [access-config-utils](https://github.com/ACCESS-NRI/access-config-utils), which keep comments and formatting, so only the lines that change are touched. Every parser hands the file over as a dictionary, so one updater serves all of them: it parses the file, merges the changes from the YAML input into it, and writes it back. The few files that need more (`jobname` in `config.yaml`, `turning_angle` in CICE namelists, the fields of `forcing.json`) have a small hook that runs before the merge.

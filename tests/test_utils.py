@@ -1,4 +1,5 @@
 import pytest
+from access.config import MOM6InputParser, NUOPCParser, YAMLParser
 from experiment_generator.utils import (
     update_config_entries,
     _merge_lists_positional,
@@ -300,13 +301,59 @@ def test_list_slot_mapping_merge_nested_and_preserve_noop():
 
 def test_recursive_list_merge_basic_replace():
     """
-    Both sides have a list at index 0 -> recurse and replace inner scalars positionally.
+    Both sides have a list at index 0 -> recurse; the inner list has no markers, so it replaces the old one.
     """
     base = {"lst": [[10, 20, 30], "unchanged"]}
-    # only inner first two replaced; third kept
     changes = {"lst": [[1, 2], PRESERVED]}
     update_config_entries(base, changes, pop_key=True)
-    assert base == {"lst": [[1, 2, 30], "unchanged"]}
+    assert base == {"lst": [[1, 2], "unchanged"]}
+
+
+def test_recursive_list_merge_with_markers_keeps_the_tail():
+    """
+    An inner list with a marker is merged by index, so the slots it does not reach are kept.
+    """
+    base = {"lst": [[10, 20, 30], "unchanged"]}
+    changes = {"lst": [[1, PRESERVED], PRESERVED]}
+    update_config_entries(base, changes, pop_key=True)
+    assert base == {"lst": [[1, 20, 30], "unchanged"]}
+
+
+@pytest.mark.parametrize(
+    "change, expected",
+    [
+        ([5, 6], [5, 6]),  # shorter: the old tail is not kept
+        ([5], [5]),
+        ([5, 6, 7, 8, 9], [5, 6, 7, 8, 9]),
+        ([[5, 6]], [[5, 6]]),  # a nested list without markers is a plain value too
+    ],
+)
+def test_update_config_entries_list_without_markers_replaces_the_list(change, expected):
+    base = {"k": [1, 2, 3, 4]}
+    update_config_entries(base, {"k": change})
+    assert base == {"k": expected}
+
+
+def test_update_config_entries_marker_in_a_nested_list_merges_by_index():
+    """
+    A marker at any depth makes the merge positional, so it is never written as a value.
+    """
+    base = {"k": [[1, 2], [3, 4], 5]}
+    update_config_entries(base, {"k": [[PRESERVED, 6], [7]]})
+    assert base == {"k": [[1, 6], [7], 5]}
+
+
+def test_merge_lists_positional_replacement_keeps_the_baseline_for_markers():
+    """
+    A replacement records the list it replaced, so a later run with markers still indexes the original list.
+    """
+    state = {}
+    out = _merge_lists_positional(base_list=[10, 20, 30], change_list=[1], path="k", state=state, pop_key=True)
+    assert out == [1]
+    assert state["k::BASE"] == [10, 20, 30]
+
+    out = _merge_lists_positional(base_list=out, change_list=[PRESERVED, 2], path="k", state=state, pop_key=True)
+    assert out == [10, 2, 30]
 
 
 def test_drop_key_when_cleaned_to_empty_sequence_and_pop_key_true_scalar_base():
@@ -469,3 +516,87 @@ def test_update_config_entries_unwraps_single_item_list_to_scalar_when_base_is_s
 #     changes = {"lst": [{}, {}, {}]}
 #     update_config_entries(base, changes, pop_key=True)
 #     assert base == {"lst": ["only"]}
+
+
+# --- configurations parsed by access-config-utils ---
+
+
+def test_update_config_entries_config_int_over_float():
+    """
+    A YAML int written over a float stays a float, as a parsed Config keeps each value's type.
+    """
+    config = MOM6InputParser().parse("DT = 900.0\nLAYOUT = 4.0, 4.0\nNK = 75\n")
+    update_config_entries(config, {"DT": 1800, "LAYOUT": [8, 8], "NK": 50})
+    assert str(config) == "DT = 1800.0\nLAYOUT = 8.0, 8.0\nNK = 50\n"
+
+
+def test_update_config_entries_config_type_change_moves_entry():
+    """
+    A value of another type cannot be written in place, so the entry is written anew at the end.
+    """
+    config = MOM6InputParser().parse('NK = 75\nINPUTDIR = "INPUT"\n')
+    update_config_entries(config, {"NK": "75"})
+    assert str(config) == 'INPUTDIR = "INPUT"\nNK = "75"\n'
+
+
+def test_update_config_entries_config_list():
+    config = NUOPCParser().parse("ATTRS::\n  levels = 1:10:19\n  model = mom\n::\n")
+    state = {}
+
+    # unchanged: the file is left alone
+    update_config_entries(config, {"ATTRS": {"levels": [1, "PRESERVE", 19]}}, state=state)
+    assert str(config) == "ATTRS::\n  levels = 1:10:19\n  model = mom\n::\n"
+
+    # same length: written in place
+    update_config_entries(config, {"ATTRS": {"levels": [1, 5, 19]}}, state=state)
+    assert str(config) == "ATTRS::\n  levels = 1:5:19\n  model = mom\n::\n"
+
+    # another length: laid out again where it is
+    update_config_entries(config, {"ATTRS": {"levels": [1, 2, 3, 4]}}, state={})
+    assert str(config) == "ATTRS::\n  levels = 1:2:3:4\n  model = mom\n::\n"
+
+    # every element removed: the entry is removed
+    update_config_entries(config, {"ATTRS": {"levels": [REMOVED] * 4}}, state={})
+    assert str(config) == "ATTRS::\n  model = mom\n::\n"
+
+
+def test_update_config_entries_config_list_shorter():
+    """
+    A shorter list replaces the old one, even when it matches the start of it.
+    """
+    config = NUOPCParser().parse("ATTRS::\n  levels = 1:10:19\n  model = mom\n::\n")
+    update_config_entries(config, {"ATTRS": {"levels": [1, 10]}}, state={})
+    assert str(config) == "ATTRS::\n  levels = 1:10\n  model = mom\n::\n"
+
+
+def test_update_config_entries_config_unwritable_value():
+    config = MOM6InputParser().parse("DT = 900.0\n")
+    with pytest.raises(ValueError, match=r"MOM_input.DT: cannot write None"):
+        update_config_entries(config, {"DT": None}, path="MOM_input")
+
+
+def test_update_config_entries_config_with_yaml_input_types():
+    """
+    The YAML input is loaded round-trip, so its values are ruamel.yaml subclasses of the builtin types.
+    """
+    changes = YAMLParser().parse("""
+DT: 1200.0
+INPUTDIR: "INPUT2"
+USE_KPP: &flag true
+BULKMIXEDLAYER: *flag
+NK: &nk 50
+LAYOUT: [8, 8]
+KPP:
+  N_SMOOTH: 2
+NEW_BLOCK:
+  A: 0.5
+""")
+    config = MOM6InputParser().parse(
+        'DT = 900.0\nINPUTDIR = "INPUT"\nUSE_KPP = False\nBULKMIXEDLAYER = True\nNK = 75\nLAYOUT = 4, 4\n'
+        "KPP%\nN_SMOOTH = 1\n%KPP\n"
+    )
+    update_config_entries(config, changes)
+    assert str(config) == (
+        'DT = 1200.0\nINPUTDIR = "INPUT2"\nUSE_KPP = True\nBULKMIXEDLAYER = True\nNK = 50\nLAYOUT = 8, 8\n'
+        "KPP%\nN_SMOOTH = 2\n%KPP\nNEW_BLOCK%\nA = 0.5\n%NEW_BLOCK\n"
+    )

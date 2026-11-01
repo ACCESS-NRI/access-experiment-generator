@@ -6,13 +6,7 @@ from collections.abc import Mapping  # , Sequence  # , Hashable
 from payu.branch import checkout_branch
 from .base_experiment import BaseExperiment
 from payu.git_utils import GitRepository
-from .f90nml_updater import F90NamelistUpdater
-from .config_updater import ConfigUpdater
-from .nuopc_runconfig_updater import NuopcRunConfigUpdater
-from .mom6_input_updater import Mom6InputUpdater
-from .nuopc_runseq_updater import NuopcRunseqUpdater
-from .om2_forcing_updater import Om2ForcingUpdater
-from .field_table_updater import FieldTableUpdater
+from .config_file_updater import ConfigFileUpdater
 from .common_var import BRANCH_KEY, _is_removed_str, _is_preserved_str, _is_seq
 from .utils import _strip_preserved
 from .state_store import RemoveStateStore
@@ -51,41 +45,21 @@ class PerturbationExperiment(BaseExperiment):
         # state store for managing parameter removals
         self.state_store = RemoveStateStore(self.directory)
 
-        # updater for each configuration file
-        self.f90namelistupdater = F90NamelistUpdater(directory)
-        self.configupdater = ConfigUpdater(directory)
-        self.nuopcrunconfigupdater = NuopcRunConfigUpdater(directory)
-        self.mom6inputupdater = Mom6InputUpdater(directory)
-        self.nuopcrunsequpdater = NuopcRunseqUpdater(directory)
-        self.om2forcingupdater = Om2ForcingUpdater(directory)
-        self.fieldtableupdater = FieldTableUpdater(directory)
+        # updater for every configuration file that has a parser
+        self.configfileupdater = ConfigFileUpdater(directory)
 
     def _apply_updates(self, file_params: dict[str, dict], state: dict | None = None) -> None:
         """
         Apply a dict of `{filename: parameters}` to different config files.
         """
         for filename, params in file_params.items():
-            # TODO: this is temporary because f90nml_updater.update_nml_params does not use
-            # update_config_entries() yet. This will be fixed as long as access-parsers implements.
+            # strip "PRESERVE" markers first, so that the updaters only see the changes to make
             should_apply, params = _strip_preserved(params)
             if not should_apply:
                 params = {}
 
-            if filename.endswith("_in") or filename.endswith(".nml") or os.path.basename(filename) == "namelists":
-                # Fortran namelist does not contain nested lists hence state store is not required here
-                self.f90namelistupdater.update_nml_params(params, filename)
-            elif filename.endswith(".yaml"):
-                self.configupdater.update_config_params(params, filename, state=state)
-            elif filename == "nuopc.runconfig":
-                self.nuopcrunconfigupdater.update_runconfig_params(params, filename, state=state)
-            elif filename == "MOM_input":
-                self.mom6inputupdater.update_mom6_params(params, filename, state=state)
-            elif filename == "nuopc.runseq":
-                self.nuopcrunsequpdater.update_nuopc_runseq(params, filename, state=state)
-            elif filename == "atmosphere/forcing.json":
-                self.om2forcingupdater.update_forcing_params(params, filename, state=state)
-            elif filename.endswith("field_table"):
-                self.fieldtableupdater.update_field_table_params(params, filename, state=state)
+            if ConfigFileUpdater.parser_for(filename) is not None:
+                self.configfileupdater.update_params(params, filename, state=state)
 
     def _run_checkout(self, **kwargs) -> None:
         """

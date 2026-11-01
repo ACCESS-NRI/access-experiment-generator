@@ -14,14 +14,14 @@ Control_Experiment:
   # This example demonstrates how to use special markers in the control experiment.
   # PRESERVE keeps the original value from the base config.
   # REMOVE deletes the key entirely.
-  # null (or empty/~) sets the key to None.
+  # null (or empty/~) is a null value, for YAML files only: a namelist like this one refuses it.
   ice/cice_in.nml:
     domain_nml:
       nprocs: PRESERVE
       processor_shape: "'slenderX1'"
       maskhalo_dyn: false
       maskhalo_bound: REMOVE
-      maskhalo_remap: # empty/null/~ sets this to None
+      maskhalo_remap: REMOVE # not ~, which a namelist refuses: CICE then uses its compiled default
 
 
 Perturbation_Experiment:
@@ -40,7 +40,7 @@ Perturbation_Experiment:
         use_leap_years: PRESERVE # keeps the original use_leap_years = .true.
         use_restart_time: False # use_restart_time = .false.
         diagfreq: REMOVE # diagfreq is removed
-        runtype: # empty or null or ~ sets -> runtype = None
+        runtype: REMOVE # not ~, which a namelist refuses: CICE then uses its compiled default
 
 
   # 2. Per-branch lists
@@ -53,7 +53,7 @@ Perturbation_Experiment:
       setup_nml:
         use_restart_time:
           # 1st branch
-          - # empty or null or ~ sets -> runtype = None
+          - false # use_restart_time = .false.
           # 2nd branch
           - REMOVE # use_restart_time is removed
           # 3rd branch
@@ -99,6 +99,7 @@ Perturbation_Experiment:
               - - PRESERVE # keeps all elements under `input` for the 1st branch
               - - REMOVE # removes all element under `input` for the 2nd branch
               - - replace_1st_ncfile_only.nc # replaces the 1st element under `input` for the 3rd branch
+                - PRESERVE # keeps the other elements (without a marker, the list would replace all of `input`)
 
 
   # 4. Nested dicts with branch-indexed fields

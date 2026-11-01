@@ -51,8 +51,8 @@ Perturbation_Experiment:
             MED med_phases_restart_write
             MED med_phases_profile
           @
-        - ~
+        - PRESERVE # no new run sequence for perturb_2, which only changes cpl_dt
 
       cpl_dt:
-        - ~
+        - PRESERVE # perturb_1 takes the whole run sequence above
         - 10.0

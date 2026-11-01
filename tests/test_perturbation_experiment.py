@@ -73,15 +73,7 @@ def test_collect_defs_warns_and_skips_block_without_branches(tmp_repo_dir, indat
 
 
 def test_apply_updates_with_correct_updaters(tmp_repo_dir, patch_updaters, indata):
-    (
-        f90_recorder,
-        payuconfig_recorder,
-        nuopc_runconfig_recorder,
-        mom6_input_recorder,
-        nuopc_runseq_recorder,
-        om2_forcing_recorder,
-        field_table_recorder,
-    ) = patch_updaters
+    config_file_recorder = patch_updaters
 
     expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
     state = {}
@@ -122,49 +114,47 @@ def test_apply_updates_with_correct_updaters(tmp_repo_dir, patch_updaters, indat
         state=state,
     )
 
-    assert f90_recorder.calls[0] == ("update_nml_params", {"diagfreq": 720}, "ice_in")
-    assert f90_recorder.calls[1] == (
-        "update_nml_params",
-        {"MOM_input_nml": {"parameter_filename": "MOM_input"}},
-        "input.nml",
-    )
-    assert payuconfig_recorder.calls[0] == ("update_config_params", {"queue": "express"}, "config.yaml")
-    assert nuopc_runseq_recorder.calls[0] == ("update_nuopc_runseq", {"cpl_dt": 20}, "nuopc.runseq")
-    assert nuopc_runconfig_recorder.calls[0] == (
-        "update_runconfig_params",
-        {"ALLCOMP_attributes": {"ATM_model": "satm"}},
-        "nuopc.runconfig",
-    )
-    assert mom6_input_recorder.calls[0] == ("update_mom6_params", {"DT": 3600.0}, "MOM_input")
-    assert om2_forcing_recorder.calls[0] == (
-        "update_forcing_params",
-        {
-            "tas": {
-                "perturbations": [
-                    {"type": "scaling", "dimension": "temporal", "value": "test_data/temporal.RYF.rsds.1990_1991.nc"}
-                ]
-            }
-        },
-        "atmosphere/forcing.json",
-    )
-    assert field_table_recorder.calls[0] == (
-        "update_field_table_params",
-        {
-            "temp": {
-                "ocean_mod": {
-                    "prog_tracers": {
-                        "methods": [
-                            {
-                                "key": "restart_file",
-                                "value": "ocean_temp_salt2.res.nc",
-                            }
-                        ]
+    assert config_file_recorder.calls == [
+        ("update_params", {"diagfreq": 720}, "ice_in"),
+        ("update_params", {"MOM_input_nml": {"parameter_filename": "MOM_input"}}, "input.nml"),
+        ("update_params", {"queue": "express"}, "config.yaml"),
+        ("update_params", {"cpl_dt": 20}, "nuopc.runseq"),
+        ("update_params", {"ALLCOMP_attributes": {"ATM_model": "satm"}}, "nuopc.runconfig"),
+        ("update_params", {"DT": 3600.0}, "MOM_input"),
+        (
+            "update_params",
+            {
+                "tas": {
+                    "perturbations": [
+                        {
+                            "type": "scaling",
+                            "dimension": "temporal",
+                            "value": "test_data/temporal.RYF.rsds.1990_1991.nc",
+                        }
+                    ]
+                }
+            },
+            "atmosphere/forcing.json",
+        ),
+        (
+            "update_params",
+            {
+                "temp": {
+                    "ocean_mod": {
+                        "prog_tracers": {
+                            "methods": [
+                                {
+                                    "key": "restart_file",
+                                    "value": "ocean_temp_salt2.res.nc",
+                                }
+                            ]
+                        }
                     }
                 }
-            }
-        },
-        "field_table",
-    )
+            },
+            "field_table",
+        ),
+    ]
 
 
 def test_manage_control_expt_applies_updates_and_commits(tmp_repo_dir, indata, patch_git, checkout_recorder):
@@ -221,7 +211,7 @@ def test_manage_perturb_expt_creat_branches_applies_updates_and_commits(
         directory=tmp_repo_dir, indata={**indata, "Perturbation_Experiment": perturb_block}
     )
 
-    f90_recorder, payuconfig_recorder, _, _, _, _, _ = patch_updaters
+    config_file_recorder = patch_updaters
 
     expt.manage_perturb_expt()
 
@@ -239,10 +229,12 @@ def test_manage_perturb_expt_creat_branches_applies_updates_and_commits(
         assert "Updated perturbation files" in msg
 
     # Updaters receive run-specific params
-    assert payuconfig_recorder.calls[0] == ("update_config_params", {"queue": "express"}, "config.yaml")
-    assert payuconfig_recorder.calls[1] == ("update_config_params", {"queue": "expresssr"}, "config.yaml")
-    assert f90_recorder.calls[0] == ("update_nml_params", {"diagfreq": 360}, "ice_in")
-    assert f90_recorder.calls[1] == ("update_nml_params", {"diagfreq": 720}, "ice_in")
+    assert config_file_recorder.calls == [
+        ("update_params", {"queue": "express"}, "config.yaml"),
+        ("update_params", {"diagfreq": 360}, "ice_in"),
+        ("update_params", {"queue": "expresssr"}, "config.yaml"),
+        ("update_params", {"diagfreq": 720}, "ice_in"),
+    ]
 
 
 @pytest.mark.parametrize(
@@ -426,35 +418,34 @@ def test_extract_run_specific_params_raises_on_list_of_dicts_inconsistent_outer_
 
 
 def test_apply_updates_strips_preserve_top_level_sets_empty_dict(tmp_repo_dir, indata, patch_updaters):
-    # TODO: remove this test when f90nml_updater.update_nml_params uses update_config_entries()
-    # after access-parsers implements it.
-    f90_recorder, *_rest = patch_updaters
+    # a namelist group must be a dict, so a group marked "PRESERVE" is stripped before the updater sees it
+    config_file_recorder = patch_updaters
 
     expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
     state = {}
     expt._apply_updates({"ice/cice_in.nml": {"setup_nml": "PRESERVE"}}, state=state)
 
-    assert f90_recorder.calls == [
-        ("update_nml_params", {}, "ice/cice_in.nml"),
+    assert config_file_recorder.calls == [
+        ("update_params", {}, "ice/cice_in.nml"),
     ]
 
 
 def test_apply_updates_hits_namelists_and_unknown_file(tmp_repo_dir, indata, patch_updaters):
-    f90_recorder, *_rest = patch_updaters
+    config_file_recorder = patch_updaters
     expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
 
     state = {}
     expt._apply_updates(
         {
-            "namelists": {"grp": {"x": 1}},  # basename == "namelists" -> f90 updater
+            "namelists": {"grp": {"x": 1}},  # basename == "namelists" -> namelist parser
             "weird.unknown": {"a": 1},  # no branch matches -> fallthrough path
         },
         state=state,
     )
 
-    # only the "namelists" one should call f90 updater
-    assert f90_recorder.calls == [
-        ("update_nml_params", {"grp": {"x": 1}}, "namelists"),
+    # only the "namelists" one should reach the updater
+    assert config_file_recorder.calls == [
+        ("update_params", {"grp": {"x": 1}}, "namelists"),
     ]
 
 
