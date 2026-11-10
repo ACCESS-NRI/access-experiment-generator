@@ -17,6 +17,9 @@ class BaseExperiment:
         self.model_type = indata.get("model_type", False)
 
         # Repository setup
+        # `source_experiment_path` in the input resolves `repository_url`,
+        # `start_point`, `parent_experiment` and `restart_path` from an archived payu run
+        # before this runs, so those four may already be filled in; see source_experiment.py.
         self.repository_url = indata.get("repository_url")
         self.repo_dir = indata.get("repository_directory")
         self.directory = (self.test_path / self.repo_dir).resolve()
