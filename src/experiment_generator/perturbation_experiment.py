@@ -103,6 +103,9 @@ class PerturbationExperiment(BaseExperiment):
     def _checkout_existing_branch(self, branch_name: str) -> None:
         """
         Checkout an existing experiment branch using the requested UUID policy.
+
+        The laboratory is set as when the branch was created, so Payu looks for the archive and
+        points the archive/work symlinks in the same place.
         """
         self._run_checkout(
             branch_name=branch_name,
@@ -111,6 +114,8 @@ class PerturbationExperiment(BaseExperiment):
             keep_uuid=self.keep_uuid,
             start_point=branch_name,
             config_path=self.directory / "config.yaml",
+            model_type=self.model_type,
+            lab_path=self.lab_path,
         )
 
     def manage_control_expt(self) -> None:
