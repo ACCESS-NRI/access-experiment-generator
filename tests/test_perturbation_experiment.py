@@ -182,7 +182,13 @@ def test_manage_control_expt_applies_updates_and_commits(tmp_repo_dir, indata, p
         "atmosphere/forcing.json": {"tas": {"perturbations": [{"type": "REMOVE"}]}},
     }
 
-    indata = {**indata, "Control_Experiment": control_block, "keep_uuid": False, "new_uuid": True}
+    indata = {
+        **indata,
+        "Control_Experiment": control_block,
+        "keep_uuid": False,
+        "new_uuid": True,
+        "lab_path": "/scratch/lab",
+    }
     expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
 
     expt.manage_control_expt()
@@ -194,6 +200,8 @@ def test_manage_control_expt_applies_updates_and_commits(tmp_repo_dir, indata, p
             "keep_uuid": False,
             "start_point": indata["control_branch_name"],
             "config_path": tmp_repo_dir / "config.yaml",
+            "model_type": indata["model_type"],
+            "lab_path": "/scratch/lab",
         }
     ]
 
@@ -358,7 +366,9 @@ def test_extract_run_specific_params_rules(tmp_repo_dir, indata, param_dict, ind
 @pytest.mark.parametrize("new_uuid", [False, True])
 def test_setup_branch_is_new_branch_false(tmp_repo_dir, indata, patch_git, checkout_recorder, new_uuid):
     patch_git.repo.branches = [DummyBranch("perturb_1")]
-    expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata={**indata, "new_uuid": new_uuid})
+    expt = pert_exp.PerturbationExperiment(
+        directory=tmp_repo_dir, indata={**indata, "new_uuid": new_uuid, "lab_path": "/scratch/lab"}
+    )
     expt_def = ed(
         block_name="Parameter_block1",
         branch_name="perturb_1",
@@ -374,6 +384,9 @@ def test_setup_branch_is_new_branch_false(tmp_repo_dir, indata, patch_git, check
     assert call["start_point"] == "perturb_1"
     assert call["is_new_experiment"] is new_uuid
     assert call["keep_uuid"] is True
+    # the same laboratory as when the branch was created
+    assert call["model_type"] == indata["model_type"]
+    assert call["lab_path"] == "/scratch/lab"
 
 
 def test_checkout_runs_from_control_directory_and_restores_cwd_on_error(tmp_repo_dir, indata, monkeypatch, tmp_path):
