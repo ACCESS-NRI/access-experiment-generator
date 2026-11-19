@@ -34,3 +34,5 @@ class BaseExperiment:
 
         # Experiment mode
         self.perturbation_enabled = indata.get("Perturbation_Experiment", False)
+        # Check out each perturbation branch in its own git worktree, next to the control directory
+        self.use_worktrees = indata.get("use_worktrees", False)

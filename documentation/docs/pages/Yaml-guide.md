@@ -15,6 +15,7 @@ Your experiment plan is a YAML file. This section explains how to write it corre
 | `control_branch_name` | `ctrl`                                               | Control branch name             |
 | `keep_uuid`            | `false`                                              | Keep the UUID unchanged if one exists. For a pre-existing UUID, this overrides `new_uuid`. |
 | `new_uuid`             | `false`                                              | Generate a new UUID and archive when checking out an existing branch, equivalent to payu's `--new-uuid` flag. |
+| `use_worktrees`        | `false`                                              | Check out each perturbation branch in its own directory, a git worktree. See [Perturbation directories](#perturbation-directories-with-use_worktrees). |
 | `Control_Experiment`  |           | Edits to apply to control branch    |
 | `Perturbation_Experiment` | see below                                        | Blocks of perturbations             |
 
@@ -27,6 +28,35 @@ to payu without changing them, so payu's precedence applies: when a pre-existing
 keeps that UUID even if `new_uuid: true` is also set. For an intentional reset after deleting an archive, use
 `keep_uuid: false` with `new_uuid: true`. For later runs that should retain the newly generated identity, use
 `keep_uuid: true` with `new_uuid: false`.
+
+### Perturbation directories with `use_worktrees`
+
+By default, every branch lives in the control directory, and the generator switches between them with
+`payu checkout`. With `use_worktrees: true`, each perturbation branch gets its own directory: a
+[git worktree](https://git-scm.com/docs/git-worktree) that shares the control directory's repository.
+
+```
+prototype-0.1.0/                     # test_path
+├── 1deg_jra55_ryf/                  # control directory, stays on the control branch
+├── perturb_1/
+│   └── 1deg_jra55_ryf/              # worktree on branch perturb_1
+└── perturb_2/
+    └── 1deg_jra55_ryf/              # worktree on branch perturb_2
+```
+
+Each directory has its own payu metadata and `archive`/`work` symlinks, so you can `payu run` several experiments at
+the same time. Experiment names and `jobname` are the same as without worktrees, because every worktree keeps the
+control directory's name.
+
+Running the generator again reuses the worktrees, recreates any whose directory was deleted, and moves branches made
+by an earlier run without worktrees into worktrees.
+
+git checks out a branch in only one worktree, so `git checkout perturb_1` in the control directory fails. `cd` into
+`perturb_1/1deg_jra55_ryf` instead. For the same reason, a branch can't have the same name as `repository_directory`.
+
+!!! note
+    The [ACCESS experiment runner](https://github.com/ACCESS-NRI/access-experiment-runner) does not support
+    experiments generated with `use_worktrees` yet. Until it does, run them with payu directly.
 
 ## 2. Control experiment edits
 

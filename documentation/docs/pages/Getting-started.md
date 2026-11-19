@@ -92,4 +92,8 @@ You’ll get,
 - a `ctrl` branch without edits
 - `perturb_1`, `perturb_2` branches with their respective parameter values committed
 
+All branches share the `my-experiment/1deg_jra55_ryf` directory. To give each perturbation branch its own directory,
+so that several experiments can run at the same time, add `use_worktrees: true` to the YAML. See the
+[YAML guide](Yaml-guide.md#perturbation-directories-with-use_worktrees).
+
 
