@@ -396,6 +396,26 @@ def test_checkout_runs_from_control_directory_and_restores_cwd_on_error(tmp_repo
     assert Path.cwd() == original_directory
 
 
+def test_checkout_existing_branch_in_worktree_runs_there_with_its_control_path(
+    tmp_repo_dir, indata, checkout_recorder, monkeypatch, tmp_path
+):
+    worktree = tmp_path / "perturb_1" / "test_repo"
+    worktree.mkdir(parents=True)
+    observed_directories = []
+    monkeypatch.setattr(
+        pert_exp,
+        "checkout_branch",
+        lambda **kwargs: (observed_directories.append(Path.cwd()), checkout_recorder.append(kwargs)),
+    )
+    expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
+
+    expt._checkout_existing_branch("perturb_1", worktree)
+
+    assert observed_directories == [worktree]
+    assert checkout_recorder[0]["config_path"] == worktree / "config.yaml"
+    assert checkout_recorder[0]["control_path"] == worktree
+
+
 def test_extract_run_specific_params_raises_on_invalid_list_length(tmp_repo_dir, indata):
     expt = pert_exp.PerturbationExperiment(directory=tmp_repo_dir, indata=indata)
     with pytest.raises(ValueError):

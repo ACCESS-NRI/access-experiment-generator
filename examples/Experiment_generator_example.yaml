@@ -9,6 +9,7 @@ test_path: prototype-0.1.0 # All control and perturbation experiment repositorie
 repository_directory: 1deg_jra55_ryf # Local directory name for the central repository (user-defined)
 
 control_branch_name: ctrl
+# use_worktrees: true # Give each perturbation branch its own directory, <test_path>/<branch>/<repository_directory>
 
 Control_Experiment:
   accessom2.nml:

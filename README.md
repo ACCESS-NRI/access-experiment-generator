@@ -89,6 +89,7 @@ repository_directory: 1deg_jra55_ryf # Local directory name for the central repo
 control_branch_name: ctrl
 keep_uuid: false # Keep a pre-existing UUID. If true, this overrides new_uuid.
 new_uuid: false # Generate a fresh UUID for an existing branch. Equivalent to Payu's --new-uuid.
+# use_worktrees: true # Give each perturbation branch its own directory, <test_path>/<branch>/<repository_directory>
 
 Control_Experiment:
   accessom2.nml:
@@ -153,3 +154,14 @@ git branch
 git checkout perturb_1
 git diff ctrl -- ice/cice_in.nml
 ```
+
+### With `use_worktrees: true`
+Each perturbation branch is checked out in its own directory, a git worktree that shares the control directory's
+repository, so the experiments can run at the same time:
+```bash
+cd my-experiment/perturb_1/1deg_jra55_ryf
+git diff ctrl -- ice/cice_in.nml
+payu run
+```
+git checks out a branch in only one worktree, so `git checkout perturb_1` in the control directory fails in this mode.
+The [ACCESS experiment runner](https://github.com/ACCESS-NRI/access-experiment-runner) does not support this layout yet.

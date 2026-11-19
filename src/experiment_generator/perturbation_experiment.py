@@ -2,6 +2,7 @@ import os
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 from collections.abc import Mapping  # , Sequence  # , Hashable
 from payu.branch import checkout_branch
 from .base_experiment import BaseExperiment
@@ -51,19 +52,33 @@ class PerturbationExperiment(BaseExperiment):
         # state store for managing parameter removals
         self.state_store = RemoveStateStore(self.directory)
 
-        # updater for each configuration file
-        self.f90namelistupdater = F90NamelistUpdater(directory)
-        self.configupdater = ConfigUpdater(directory)
-        self.nuopcrunconfigupdater = NuopcRunConfigUpdater(directory)
-        self.mom6inputupdater = Mom6InputUpdater(directory)
-        self.nuopcrunsequpdater = NuopcRunseqUpdater(directory)
-        self.om2forcingupdater = Om2ForcingUpdater(directory)
-        self.fieldtableupdater = FieldTableUpdater(directory)
+        # configuration file updaters, one set per experiment directory
+        self._updaters: dict[Path, SimpleNamespace] = {}
 
-    def _apply_updates(self, file_params: dict[str, dict], state: dict | None = None) -> None:
+    def _updaters_for(self, directory: Path) -> SimpleNamespace:
         """
-        Apply a dict of `{filename: parameters}` to different config files.
+        Return the configuration file updaters for an experiment directory, creating them on first use.
         """
+        if directory not in self._updaters:
+            self._updaters[directory] = SimpleNamespace(
+                f90namelist=F90NamelistUpdater(directory),
+                config=ConfigUpdater(directory),
+                nuopcrunconfig=NuopcRunConfigUpdater(directory),
+                mom6input=Mom6InputUpdater(directory),
+                nuopcrunseq=NuopcRunseqUpdater(directory),
+                om2forcing=Om2ForcingUpdater(directory),
+                fieldtable=FieldTableUpdater(directory),
+            )
+        return self._updaters[directory]
+
+    def _apply_updates(
+        self, file_params: dict[str, dict], state: dict | None = None, directory: Path | None = None
+    ) -> None:
+        """
+        Apply a dict of `{filename: parameters}` to different config files in `directory`
+        (the control directory by default).
+        """
+        updaters = self._updaters_for(directory or self.directory)
         for filename, params in file_params.items():
             # TODO: this is temporary because f90nml_updater.update_nml_params does not use
             # update_config_entries() yet. This will be fixed as long as access-parsers implements.
@@ -73,44 +88,50 @@ class PerturbationExperiment(BaseExperiment):
 
             if filename.endswith("_in") or filename.endswith(".nml") or os.path.basename(filename) == "namelists":
                 # Fortran namelist does not contain nested lists hence state store is not required here
-                self.f90namelistupdater.update_nml_params(params, filename)
+                updaters.f90namelist.update_nml_params(params, filename)
             elif filename.endswith(".yaml"):
-                self.configupdater.update_config_params(params, filename, state=state)
+                updaters.config.update_config_params(params, filename, state=state)
             elif filename == "nuopc.runconfig":
-                self.nuopcrunconfigupdater.update_runconfig_params(params, filename, state=state)
+                updaters.nuopcrunconfig.update_runconfig_params(params, filename, state=state)
             elif filename == "MOM_input":
-                self.mom6inputupdater.update_mom6_params(params, filename, state=state)
+                updaters.mom6input.update_mom6_params(params, filename, state=state)
             elif filename == "nuopc.runseq":
-                self.nuopcrunsequpdater.update_nuopc_runseq(params, filename, state=state)
+                updaters.nuopcrunseq.update_nuopc_runseq(params, filename, state=state)
             elif filename == "atmosphere/forcing.json":
-                self.om2forcingupdater.update_forcing_params(params, filename, state=state)
+                updaters.om2forcing.update_forcing_params(params, filename, state=state)
             elif filename.endswith("field_table"):
-                self.fieldtableupdater.update_field_table_params(params, filename, state=state)
+                updaters.fieldtable.update_field_table_params(params, filename, state=state)
 
-    def _run_checkout(self, **kwargs) -> None:
+    def _run_checkout(self, directory: Path | None = None, **kwargs) -> None:
         """
-        Run Payu checkout from the experiment control directory.
+        Run Payu checkout from an experiment directory (the control directory by default).
         """
         original_directory = Path.cwd()
         try:
             # Payu resolves some experiment configuration from the current
             # working directory, even when config_path is absolute.
-            os.chdir(self.directory)
+            os.chdir(directory or self.directory)
             checkout_branch(**kwargs)
         finally:
             os.chdir(original_directory)
 
-    def _checkout_existing_branch(self, branch_name: str) -> None:
+    def _checkout_existing_branch(self, branch_name: str, directory: Path | None = None) -> None:
         """
-        Checkout an existing experiment branch using the requested UUID policy.
+        Checkout an existing experiment branch using the requested UUID policy, either in the
+        control directory or, when `directory` is given, in that worktree.
         """
+        # Payu needs the worktree as its git repository, but the control directory keeps
+        # letting Payu derive it from config.yaml, as before.
+        control_kwargs = {} if directory is None else {"control_path": directory}
         self._run_checkout(
+            directory,
             branch_name=branch_name,
             is_new_branch=False,
             is_new_experiment=self.new_uuid,
             keep_uuid=self.keep_uuid,
             start_point=branch_name,
-            config_path=self.directory / "config.yaml",
+            config_path=(directory or self.directory) / "config.yaml",
+            **control_kwargs,
         )
 
     def manage_control_expt(self) -> None:
@@ -177,22 +198,39 @@ class PerturbationExperiment(BaseExperiment):
         # check local branches
         local_branches = self.gitrepository.local_branches_dict()
 
+        if self.use_worktrees:
+            self._prepare_worktrees(experiment_definitions)
+
         # setup each experiment (create branch names and print actions)
+        experiment_directories = []
         for expt_def in experiment_definitions:
-            self._setup_branch(expt_def, local_branches)
+            if self.use_worktrees:
+                directory = self._setup_worktree(expt_def, local_branches)
+                gitrepository = GitRepository(directory)
+            else:
+                self._setup_branch(expt_def, local_branches)
+                directory = self.directory
+                gitrepository = self.gitrepository
             branch = expt_def.branch_name
 
+            # the state store always lives in the control directory, keyed by branch
             state = self.state_store.load_state(branch)
 
             # then pass state into updates
-            self._apply_updates(expt_def.file_params, state=state)
+            self._apply_updates(expt_def.file_params, state=state, directory=directory)
 
             # save state after updates
             self.state_store.save_state(branch, state)
 
-            modified_files = [item.a_path for item in self.gitrepository.repo.index.diff(None)]
+            modified_files = [item.a_path for item in gitrepository.repo.index.diff(None)]
             commit_message = f"Updated perturbation files: {modified_files}"
-            self.gitrepository.commit(commit_message, modified_files)
+            gitrepository.commit(commit_message, modified_files)
+            experiment_directories.append(directory)
+
+        if self.use_worktrees:
+            print("-- Perturbation experiment directories:")
+            for directory in experiment_directories:
+                print(f"   {directory}")
 
     def _collect_experiment_definitions(self, namelists: dict) -> list[ExperimentDefinition]:
         """
@@ -456,3 +494,107 @@ class PerturbationExperiment(BaseExperiment):
                 lab_path=self.lab_path,
                 parent_experiment=self.parent_experiment,
             )
+
+    def _worktree_path(self, branch_name: str) -> Path:
+        """
+        Directory of the worktree for a perturbation branch: `<test_path>/<branch>/<repo_dir>`.
+
+        It keeps the control directory's name, so Payu still names the experiment
+        `<repo_dir>-<branch>-<uuid>` and `jobname` stays `<repo_dir>`.
+        """
+        path = self.directory.parent / branch_name / self.directory.name
+        if path.resolve().is_relative_to(self.directory.resolve()):
+            raise ValueError(
+                f"The worktree for branch '{branch_name}' would be {path}, inside the control directory "
+                f"{self.directory}. Use a branch name other than '{self.directory.name}'."
+            )
+        return path
+
+    def _list_worktrees(self) -> dict[Path, str | None]:
+        """
+        Map each worktree of the repository, the control directory included, to its checked-out
+        branch, or to None when its HEAD is detached.
+        """
+        worktrees = {}
+        path = None
+        for line in self.gitrepository.repo.git.worktree("list", "--porcelain").splitlines():
+            if line.startswith("worktree "):
+                path = Path(line.removeprefix("worktree ")).resolve()
+                worktrees[path] = None
+            elif line.startswith("branch refs/heads/"):
+                worktrees[path] = line.removeprefix("branch refs/heads/")
+        return worktrees
+
+    def _prepare_worktrees(self, experiment_definitions: list[ExperimentDefinition]) -> None:
+        """
+        Get the repository ready for per-branch worktrees before any branch is touched:
+          - check that no worktree would land inside the control directory,
+          - forget worktrees whose directories were deleted,
+          - move the control directory back to the control branch if a run without worktrees left it
+            on a perturbation branch, since git checks out a branch in only one worktree.
+        """
+        branch_names = [expt_def.branch_name for expt_def in experiment_definitions]
+        for branch_name in branch_names:
+            self._worktree_path(branch_name)
+
+        self.gitrepository.repo.git.worktree("prune")
+
+        control_directory_branch = self._list_worktrees().get(self.directory.resolve())
+        if control_directory_branch in branch_names:
+            print(
+                f"-- Control directory is on branch {control_directory_branch}, "
+                f"switching it back to {self.control_branch_name}!"
+            )
+            self._checkout_existing_branch(self.control_branch_name)
+
+    def _setup_worktree(self, expt_def: ExperimentDefinition, local_branches: dict) -> Path:
+        """
+        Set up the worktree of a perturbation branch and return its directory.
+
+        A new branch is created by Payu inside a fresh worktree, starting from the control branch, so it
+        gets its own UUID, metadata and archive/work symlinks. An existing branch is reused in its
+        worktree, or given one if it has none.
+        """
+        branch_name = expt_def.branch_name
+        path = self._worktree_path(branch_name)
+        resolved_path = path.resolve()
+        worktrees = self._list_worktrees()
+
+        for worktree_path, worktree_branch in worktrees.items():
+            if worktree_branch == branch_name and worktree_path != resolved_path:
+                raise RuntimeError(
+                    f"Branch '{branch_name}' is checked out at {worktree_path}, but its experiment directory "
+                    f"should be {path}. Move it there with `git worktree move`, or remove it."
+                )
+
+        branch_existed = branch_name in local_branches
+        if resolved_path not in worktrees:
+            if path.exists():
+                raise FileExistsError(
+                    f"{path} already exists and is not a worktree of {self.directory}. "
+                    f"Move it away so the experiment directory of branch '{branch_name}' can be created."
+                )
+            if branch_existed:
+                self.gitrepository.repo.git.worktree("add", str(path), branch_name)
+            else:
+                self.gitrepository.repo.git.worktree("add", "--detach", str(path), self.control_branch_name)
+
+        if branch_existed:
+            print(f"-- Branch {branch_name} already exists, using its worktree {path}!")
+            self._checkout_existing_branch(branch_name, path)
+        else:
+            print(f"-- Creating branch {branch_name} from {self.control_branch_name} in worktree {path}!")
+            self._run_checkout(
+                path,
+                branch_name=branch_name,
+                is_new_branch=True,
+                keep_uuid=self.keep_uuid,
+                start_point=self.control_branch_name,
+                restart_path=self.restart_path,
+                config_path=path / "config.yaml",
+                control_path=path,
+                model_type=self.model_type,
+                lab_path=self.lab_path,
+                parent_experiment=self.parent_experiment,
+            )
+        return path
